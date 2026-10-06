@@ -1,0 +1,10 @@
+fastapi==0.118.*
+uvicorn[standard]==0.37.*
+pydantic-settings==2.*
+psycopg[binary]==3.2.*
+psycopg-pool==3.2.*
+pgvector==0.4.*
+fastembed==0.7.*
+requests==2.*
+beautifulsoup4==4.*
+lxml==6.*
