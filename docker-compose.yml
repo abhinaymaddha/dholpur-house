@@ -1,0 +1,45 @@
+# Full stack: Postgres + pgvector, FastAPI backend, React frontend (nginx).
+#   cp backend/.env.example backend/.env   # add OPENROUTER_API_KEY
+#   docker compose up -d --build
+#   docker compose run --rm -v "/path/to/ChatExport_folder:/export:ro" backend python -m app.ingest /export
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: upsc
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-upsc}
+      POSTGRES_DB: upsc
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U upsc -d upsc"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://upsc:${POSTGRES_PASSWORD:-upsc}@db:5432/upsc
+    volumes:
+      - models:/models
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8710}:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  models:

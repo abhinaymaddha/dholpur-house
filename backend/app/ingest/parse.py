@@ -1,4 +1,4 @@
-"""Telegram Desktop HTML export -> data/raw_messages.jsonl (one row per message, untouched text)."""
+"""Telegram Desktop HTML export -> one dict per message, text untouched."""
 from __future__ import annotations
 
 from datetime import datetime
@@ -6,7 +6,6 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-from .common import RAW, write_jsonl
 
 
 def _text(div) -> str:
@@ -41,9 +40,3 @@ def parse_export(export_dir: Path) -> list[dict]:
             })
     rows.sort(key=lambda r: r["id"])
     return rows
-
-
-def run(export_dir: str) -> None:
-    rows = parse_export(Path(export_dir).expanduser())
-    n = write_jsonl(RAW, rows)
-    print(f"parsed {n} messages -> {RAW}")
