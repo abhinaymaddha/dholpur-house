@@ -2,11 +2,11 @@
 
   python run.py parse <telegram-export-dir>
   python run.py segment
-  python run.py pilot [--n 12] [--effort low]
-  python run.py submit [--effort low] [--limit N]
+  python run.py pilot [--n 12] [--effort low] [--model anthropic/claude-opus-5.5]
+  python run.py submit [--effort low] [--model ...] [--limit N]
   python run.py status
   python run.py collect [--wait]
-  python run.py retry [--effort low]
+  python run.py retry [--effort low] [--model ...]
   python run.py build
   python run.py audit [--n 50]
 """
@@ -14,7 +14,7 @@ import argparse
 import os
 from pathlib import Path
 
-# ANTHROPIC_API_KEY can live in a git-ignored .env next to this file.
+# OPENROUTER_API_KEY can live in a git-ignored .env next to this file.
 env = Path(__file__).with_name(".env")
 if env.exists():
     for line in env.read_text().splitlines():
@@ -27,6 +27,7 @@ p.add_argument("step", choices=["parse", "segment", "pilot", "submit", "status",
 p.add_argument("path", nargs="?")
 p.add_argument("--n", type=int)
 p.add_argument("--effort", default="low", choices=["low", "medium", "high"])
+p.add_argument("--model", default="anthropic/claude-opus-5.5", help="OpenRouter model slug")
 p.add_argument("--limit", type=int)
 p.add_argument("--wait", action="store_true")
 a = p.parse_args()
@@ -46,12 +47,12 @@ elif a.step == "audit":
 else:
     from upscx import extract
     if a.step == "pilot":
-        extract.pilot(a.n or 12, a.effort)
+        extract.pilot(a.n or 12, a.model, a.effort)
     elif a.step == "submit":
-        extract.submit(a.effort, a.limit)
+        extract.submit(a.model, a.effort, a.limit)
     elif a.step == "status":
         extract.status()
     elif a.step == "collect":
         extract.collect(a.wait)
     elif a.step == "retry":
-        extract.retry(a.effort)
+        extract.retry(a.model, a.effort)
