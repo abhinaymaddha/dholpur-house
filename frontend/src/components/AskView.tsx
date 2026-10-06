@@ -2,7 +2,7 @@ import { Loader2, Send, Square } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { Answer } from '../lib/text'
 import { ask } from '../services/api'
-import type { Filters, Source, Stats } from '../types'
+import { emptyFilters, type Filters, type Source, type Stats } from '../types'
 import { FiltersBar } from './FiltersBar'
 import { MetaLine } from './MetaLine'
 
@@ -15,7 +15,7 @@ const EXAMPLES = [
 
 export function AskView({ stats, onOpen }: { stats: Stats | null; onOpen: (id: string, query: string) => void }) {
   const [question, setQuestion] = useState('')
-  const [filters, setFilters] = useState<Filters>({ board: '', cse_year: '', exam: '' })
+  const [filters, setFilters] = useState<Filters>(emptyFilters)
   const [sources, setSources] = useState<Source[]>([])
   const [answer, setAnswer] = useState('')
   const [error, setError] = useState('')

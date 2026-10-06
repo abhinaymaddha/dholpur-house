@@ -99,6 +99,7 @@ def metadata(unit: dict) -> dict:
     if not optional:
         m = OPTIONAL_INLINE.search(text[:900])
         optional = m.group(1).strip() if m else None
+    alias = _field(NAME_LINE, text, 60)
     marks = None
     for m in PT_MARKS.finditer(text):
         v = int(m.group(1) or m.group(2))
@@ -106,7 +107,7 @@ def metadata(unit: dict) -> dict:
             marks = v
     return {
         "board": board_of(text),
-        "alias": _field(NAME_LINE, text, 60),
+        "alias": alias if alias and re.search(r"\w", alias) else None,   # "." / "***" -> anonymous
         "interview_date": _field(DATE_LINE, text, 60),
         "daf": _field(DAF_LINE, text, 400),
         "optional_subject": optional,

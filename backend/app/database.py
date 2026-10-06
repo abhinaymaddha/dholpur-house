@@ -42,6 +42,17 @@ CREATE TABLE IF NOT EXISTS transcripts (
 CREATE INDEX IF NOT EXISTS transcripts_tsv ON transcripts USING gin (tsv);
 CREATE INDEX IF NOT EXISTS transcripts_filters ON transcripts (cse_year, board, exam);
 
+-- Filter tags (app/ingest/tags.py) and the reader outline (app/ingest/structure.py).
+ALTER TABLE transcripts ADD COLUMN IF NOT EXISTS background   text[] NOT NULL DEFAULT '{{}}';
+ALTER TABLE transcripts ADD COLUMN IF NOT EXISTS optional_tag text;
+ALTER TABLE transcripts ADD COLUMN IF NOT EXISTS states       text[] NOT NULL DEFAULT '{{}}';
+ALTER TABLE transcripts ADD COLUMN IF NOT EXISTS interests    text[] NOT NULL DEFAULT '{{}}';
+ALTER TABLE transcripts ADD COLUMN IF NOT EXISTS topics       text[] NOT NULL DEFAULT '{{}}';
+ALTER TABLE transcripts ADD COLUMN IF NOT EXISTS question_count int NOT NULL DEFAULT 0;
+ALTER TABLE transcripts ADD COLUMN IF NOT EXISTS structure    jsonb;
+CREATE INDEX IF NOT EXISTS transcripts_topics ON transcripts USING gin (topics);
+CREATE INDEX IF NOT EXISTS transcripts_profile ON transcripts USING gin (background, states, interests);
+
 -- Units that are not clearly one marked transcript; kept for later review, not searchable.
 CREATE TABLE IF NOT EXISTS held (
     id          text PRIMARY KEY,

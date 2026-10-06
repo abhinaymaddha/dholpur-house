@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -15,12 +16,19 @@ class TranscriptMeta(BaseModel):
     cse_year: int
     posted_at: datetime
     telegram_url: str
+    background: list[str] = []
+    optional_tag: str | None = None
+    states: list[str] = []
+    interests: list[str] = []
+    topics: list[str] = []
+    question_count: int = 0
 
 
 class Transcript(TranscriptMeta):
     text: str
     message_ids: list[int]
     duplicates: list[str]
+    structure: dict[str, Any] | None = None
 
 
 class SearchHit(TranscriptMeta):
@@ -46,3 +54,21 @@ class Stats(BaseModel):
     years: list[FacetCount]
     exams: list[FacetCount]
     llm_model: str
+
+
+class YearNode(BaseModel):
+    year: int
+    count: int
+    boards: list[FacetCount]
+
+
+class Facets(BaseModel):
+    total: int
+    tree: list[YearNode]
+    exam: list[FacetCount]
+    background: list[FacetCount]
+    optional_tag: list[FacetCount]
+    state: list[FacetCount]
+    interest: list[FacetCount]
+    topic: list[FacetCount]
+    has_marks: int

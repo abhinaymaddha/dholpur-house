@@ -10,12 +10,36 @@ export interface TranscriptMeta {
   cse_year: number
   posted_at: string
   telegram_url: string
+  background: string[]
+  optional_tag: string | null
+  states: string[]
+  interests: string[]
+  topics: string[]
+  question_count: number
+}
+
+export interface OutlineItem {
+  kind: 'q' | 'note'
+  text: string
+}
+
+export interface OutlineSection {
+  title: string
+  member: string | null
+  gender: 'male' | 'female' | 'unknown'
+  items: OutlineItem[]
+}
+
+export interface Outline {
+  header: ({ key: string; value: string } | { text: string })[]
+  sections: OutlineSection[]
 }
 
 export interface Transcript extends TranscriptMeta {
   text: string
   message_ids: number[]
   duplicates: string[]
+  structure: Outline | null
 }
 
 export interface SearchHit extends TranscriptMeta {
@@ -47,7 +71,31 @@ export interface Filters {
   board: string
   cse_year: string
   exam: string
+  background: string
+  optional_tag: string
+  state: string
+  interest: string
+  topics: string[]
+  has_marks: boolean
 }
+
+export const emptyFilters = (): Filters => ({
+  board: '', cse_year: '', exam: '', background: '', optional_tag: '', state: '', interest: '', topics: [], has_marks: false,
+})
+
+export interface Facets {
+  total: number
+  tree: { year: number; count: number; boards: FacetCount[] }[]
+  exam: FacetCount[]
+  background: FacetCount[]
+  optional_tag: FacetCount[]
+  state: FacetCount[]
+  interest: FacetCount[]
+  topic: FacetCount[]
+  has_marks: number
+}
+
+export type SortOrder = 'recent' | 'questions' | 'marks'
 
 export interface Source extends TranscriptMeta {
   score: number

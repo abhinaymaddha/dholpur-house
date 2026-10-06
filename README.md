@@ -96,6 +96,18 @@ npm install
 npm run dev                                 # http://localhost:5173, proxies /api to :8000
 ```
 
+Or, once both are set up, `./scripts/dev.sh` runs the API and the frontend together with auto-reload.
+
+On macOS without Docker, Postgres can come from Homebrew:
+
+```bash
+brew install postgresql@17 pgvector python@3.12 && brew services start postgresql@17
+psql -d postgres -c "CREATE ROLE upsc LOGIN PASSWORD 'upsc'" -c "CREATE DATABASE upsc OWNER upsc"
+psql -d upsc -c "CREATE EXTENSION vector"
+cd backend && python3.12 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+.venv/bin/python -m app.ingest --seed       # load the committed data (~5 min)
+```
+
 ## Repository layout
 
 ```
