@@ -24,12 +24,40 @@ NOISE_SOURCES = {"CSE Updates", "Prince Sonu Mayank, IPS"}   # forwarded officia
 DUP_JACCARD = 0.6
 
 
+# Header fields that never appear mid-transcript ("Chairman:" does, when the chair resumes questioning).
+OPENING_HEADER = re.compile(
+    r"^\s*(?:\d+[.)]\s*)?(?:name|board|daf|key\s*words?|keywords|optional|interview\s*date|date|duration)\b"
+    r"[^\n]{0,40}[:\-–]",
+    re.I | re.M,
+)
+# Chairperson surnames, for headers written without a "Board:" label ("BB Swain sir\nOptional History").
+BOARD_NAME = re.compile(
+    r"\b(verma|varma|dasa|suman|sheel\s*[vw]ardhan|shukla|swain|sujat?ha|chaturvedi|anuradha|preeti|sudan)\b", re.I)
+DATE_LEAD = re.compile(
+    r"^\W*(?:\d{1,2}(?:st|nd|rd|th)?\s*(?:jan|feb|mar|apr|dec)|\d{1,2}[./-]\d{1,2}[./-]\d{2,4})", re.I)
+SESSION_WORDS = re.compile(r"board|session|forenoon|afternoon|to go|\b(?:FN|AN)\b", re.I)
+SPLIT_LIMIT = 3300   # a message this long was likely cut by Telegram's 4096-char cap
+
+
 def _header_hits(text: str) -> int:
     return len(HEADER.findall(text[:600]))
 
 
+def _strong_start(text: str) -> bool:
+    """Evidence of a new transcript strong enough to override 'previous message was cut off'."""
+    head = text[:150]
+    return (_header_hits(text) >= 2
+            or "transcript" in head[:80].lower()
+            or bool(BOARD_NAME.search(head) and (SESSION_WORDS.search(head) or DATE_LEAD.match(head))))
+
+
 def _starts_transcript(text: str) -> bool:
-    return _header_hits(text) >= 2
+    head = text[:250]
+    return (_strong_start(text)
+            or bool(OPENING_HEADER.search(head))
+            or bool(BOARD_NAME.search(head))
+            or bool(DATE_LEAD.match(head))
+            or "transcript" in head[:80].lower())
 
 
 def _shingles(text: str, k: int = 5) -> set[int]:
@@ -50,7 +78,9 @@ def build_units(msgs: list[dict]) -> tuple[list[dict], list[dict]]:
             prev_t = t
             continue
         gap = (t - prev_t).total_seconds() if prev_t else None
-        if cur and gap is not None and gap <= CONTINUATION_GAP_S and not _starts_transcript(text):
+        prev_cut = bool(cur) and len(cur["parts"][-1]) >= SPLIT_LIMIT
+        new_start = _strong_start(text) if prev_cut else _starts_transcript(text)
+        if cur and gap is not None and gap <= CONTINUATION_GAP_S and not new_start:
             cur["message_ids"].append(m["id"])
             cur["parts"].append(text)
         else:
