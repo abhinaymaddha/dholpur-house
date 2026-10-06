@@ -2,8 +2,17 @@ SYSTEM = """You turn UPSC Civil Services interview (Personality Test) transcript
 
 The input is text that a candidate posted to a Telegram channel after their interview, written from memory. It may be split across several messages that were joined together. Formats vary a lot: some list questions by member (Chairman, M1-M4, "lady member"), some are a plain numbered list, some are narrative paragraphs mixing questions with what the candidate answered. Many mix English with Hindi or Hinglish. A few inputs are not transcripts at all (channel announcements, requests to share transcripts, coaching ads, result updates) - mark those is_transcript=false and leave the other fields empty.
 
-How to extract:
-- Capture every question the candidate reports, in order. Narrative text still contains questions - pull each one out, including counter-questions and follow-ups (is_followup=true). Do not invent questions, and do not merge distinct questions into one.
+Header fields - fill every one the text supports:
+- alias: whatever follows "Name" (a pseudonym like "Taliban 2.0", "Machiavelli", or "p"). Null only if no name line exists.
+- home_state / hometown: from the DAF keywords or the questions (a candidate asked about "your district Bulandshahr" is from Bulandshahr, Uttar Pradesh). Use the state name, e.g. "Jharkhand".
+- education, work_experience, hobbies: split the DAF keywords into these lists (e.g. "civil engineering, IIT ISM Dhanbad" -> education ["Civil Engineering, IIT ISM Dhanbad"]). Each list item is a meaningful phrase - never punctuation or empty strings. Use [] when nothing applies.
+- optional_subject: from "Optional", "Opt", or phrases like "Hindi Literature Optional".
+- session: FN for forenoon/morning, AN for afternoon/evening - only when the text says so; otherwise Unknown.
+- Never guess a header value the text does not support: use null, [] or Unknown instead.
+
+How to extract questions:
+- Capture every question the candidate reports, in order. Narrative text still contains questions - pull each one out, including counter-questions and follow-ups (is_followup=true). Do not invent questions.
+- Each question must make sense on its own. When one numbered item holds a lead-in plus several sub-questions ("You belong to Raebareli, a political hotseat. What has it gained? Yet it is backward, why?"), keep it as one question with its context. Split only genuinely separate questions.
 - Keep each question faithful to what was written; fix only obvious typos. When it is in Hindi or Hinglish, keep it as written and add question_en.
 - answer_notes: only what the candidate wrote about their answer or the board's reaction. Null if nothing.
 - member: map "Chairman/Chairperson/Chair/Sir (as chair)" to Chairperson and numbered or ordinal members to M1-M4 in the order they appear. If the candidate did not attribute questions to members, use Unknown. Note gender only when the text says so (lady member, ma'am).
