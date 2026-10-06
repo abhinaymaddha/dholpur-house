@@ -31,7 +31,25 @@ React (Vite + Tailwind)  Search · Ask · transcript reader
 
 **Retrieval for Ask** runs vector similarity and full-text match over chunks, fuses the two rankings (reciprocal rank fusion), groups by transcript, and sends the top transcripts' best sections to the LLM via [OpenRouter](https://openrouter.ai). Embeddings are computed locally with [fastembed](https://github.com/qdrant/fastembed) (`paraphrase-multilingual-MiniLM-L12-v2`, handles Hindi), so only answer generation needs an API key.
 
-## Run it
+## Data
+
+`backend/seed/csetranscripts_messages.jsonl` holds every message from the public Telegram channel
+[@csetranscripts](https://t.me/csetranscripts) (text only, one JSON object per message). On first start, when the
+database is empty, the backend loads it automatically (a few minutes: transcripts are parsed and embedded).
+
+To load a newer export:
+
+- **CLI:** `python -m app.ingest "<ChatExport folder>"` (or `--write-seed "<folder>"` to refresh the committed seed).
+- **HTTP** (set `ADMIN_TOKEN` first; no shell access needed on a hosted server):
+  ```bash
+  curl -H "Authorization: Bearer $ADMIN_TOKEN" -F "files=@messages.html" https://<host>/api/admin/ingest
+  curl -H "Authorization: Bearer $ADMIN_TOKEN" https://<host>/api/admin/ingest     # progress
+  ```
+
+Make an export in Telegram Desktop: channel → ⋮ → Export chat history → format HTML, media not needed.
+Every ingest replaces all data with the given messages.
+
+## Run it locally
 
 Requirements: Docker with Compose, and an [OpenRouter API key](https://openrouter.ai/keys).
 
@@ -40,13 +58,22 @@ cp backend/.env.example backend/.env        # set OPENROUTER_API_KEY (and LLM_MO
 docker compose up -d --build                # db + backend + frontend on http://localhost:8710
 ```
 
-Load transcripts from a Telegram Desktop export (channel → ⋮ → Export chat history → HTML; media is not needed):
+The first start loads the seed data and downloads the embedding model (~220 MB) into a volume.
 
-```bash
-docker compose run --rm -v "/path/to/ChatExport_folder:/export:ro" backend python -m app.ingest /export
-```
+## Deploy with Dokploy
 
-Re-running ingest replaces all data. The first run downloads the embedding model (~220 MB) into a volume.
+1. Create a **Compose** service from this GitHub repo, compose path `./docker-compose.prod.yml`.
+2. Environment:
+   ```
+   POSTGRES_PASSWORD=<long random string>
+   OPENROUTER_API_KEY=<key>
+   LLM_MODEL=nvidia/nemotron-3-super-120b-a12b:free
+   ADMIN_TOKEN=<long random string>        # optional, enables /api/admin/ingest
+   ```
+3. Domains: service `frontend`, port `80`, HTTPS on.
+4. Deploy. The database seeds itself on first start; the UI shows a notice until it's ready.
+
+Plan for about 2 GB of RAM (embedding model + Postgres).
 
 ### Choosing the LLM
 
@@ -81,15 +108,17 @@ backend/
     schemas/           response and request models
     services/          search, retrieval, llm, embeddings
     ingest/            Telegram export → Postgres
+  seed/                committed channel messages (JSONL), loaded on first start
   tests/
 frontend/
   src/
     components/        SearchView, AskView, TranscriptPanel, ...
     services/api.ts    API client (incl. the server-sent events reader)
     lib/ hooks/ types/
-docker-compose.yml
+docker-compose.yml       local stack (publishes :8710)
+docker-compose.prod.yml  Dokploy stack (Traefik via dokploy-network)
 ```
 
-## Data and privacy
+## About the transcripts
 
-The repository contains **no transcript data**. Transcripts stay in your own database, loaded from an export you make yourself. They were shared publicly by candidates, often under pseudonyms. Please respect that: don't republish them with real identities attached.
+The transcripts were shared publicly by candidates on Telegram, often under pseudonyms. Please respect that: don't use this project to attach real identities to them.

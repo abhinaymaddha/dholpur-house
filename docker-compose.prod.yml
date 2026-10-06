@@ -1,0 +1,58 @@
+# Production compose for Dokploy (Compose service, built from this GitHub repo).
+#
+# In Dokploy:
+#   - Compose path: ./docker-compose.prod.yml
+#   - Environment: POSTGRES_PASSWORD, OPENROUTER_API_KEY, LLM_MODEL, ADMIN_TOKEN (see README)
+#   - Domains: service "frontend", port 80, HTTPS on
+# No host ports are published; Traefik reaches the frontend over dokploy-network.
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: upsc
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: upsc
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U upsc -d upsc"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://upsc:${POSTGRES_PASSWORD}@db:5432/upsc
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-nvidia/nemotron-3-super-120b-a12b:free}
+      LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-4000}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+      TELEGRAM_CHANNEL: ${TELEGRAM_CHANNEL:-https://t.me/csetranscripts}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - models:/models
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    expose:
+      - "80"
+    networks:
+      - default
+      - dokploy-network
+    depends_on:
+      - backend
+
+networks:
+  dokploy-network:
+    external: true
+
+volumes:
+  pgdata:
+  models:
