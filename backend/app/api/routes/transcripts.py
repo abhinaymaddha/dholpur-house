@@ -1,9 +1,12 @@
-from fastapi import APIRouter, HTTPException, Query
+from typing import Literal
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.config import settings
 from app.database import pool
-from app.schemas.transcript import SearchResponse, Stats, Transcript
-from app.services.search import search
+from app.schemas.filters import TranscriptFilters, filters_query
+from app.schemas.transcript import Facets, SearchResponse, Stats, Transcript
+from app.services.search import facets, search
 
 router = APIRouter(prefix="/api", tags=["transcripts"])
 
@@ -11,14 +14,20 @@ router = APIRouter(prefix="/api", tags=["transcripts"])
 @router.get("/search", response_model=SearchResponse)
 def search_transcripts(
     q: str = Query("", max_length=300, description="Keywords; supports \"quoted phrases\", OR, and -exclude"),
-    board: str | None = None,
-    cse_year: int | None = None,
-    exam: str | None = None,
+    filters: TranscriptFilters = Depends(filters_query),
+    sort: Literal["recent", "questions", "marks"] = "recent",
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
 ):
-    total, rows = search(q, board, cse_year, exam, limit, offset)
+    """Keyword search, or a filtered listing when q is empty (the Browse view)."""
+    total, rows = search(q, filters, limit, offset, sort)
     return {"total": total, "hits": rows}
+
+
+@router.get("/facets", response_model=Facets)
+def transcript_facets(filters: TranscriptFilters = Depends(filters_query)):
+    """Counts per tag for the Browse sidebar, given the current filters."""
+    return facets(filters)
 
 
 @router.get("/transcripts/{transcript_id}", response_model=Transcript)

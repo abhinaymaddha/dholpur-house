@@ -1,17 +1,16 @@
 import { Loader2, Search } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useDebounce } from '../hooks/useDebounce'
-import { formatDate, Snippet } from '../lib/text'
 import { searchTranscripts } from '../services/api'
-import type { Filters, SearchHit, Stats } from '../types'
+import { emptyFilters, type Filters, type SearchHit, type Stats } from '../types'
 import { FiltersBar } from './FiltersBar'
-import { MetaLine } from './MetaLine'
+import { TranscriptCard } from './TranscriptCard'
 
 const PAGE = 20
 
 export function SearchView({ stats, onOpen }: { stats: Stats | null; onOpen: (id: string, query: string) => void }) {
   const [q, setQ] = useState('')
-  const [filters, setFilters] = useState<Filters>({ board: '', cse_year: '', exam: '' })
+  const [filters, setFilters] = useState<Filters>(emptyFilters)
   const [hits, setHits] = useState<SearchHit[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -62,20 +61,7 @@ export function SearchView({ stats, onOpen }: { stats: Stats | null; onOpen: (id
       <ul className="space-y-3">
         {hits.map((h) => (
           <li key={h.id}>
-            <button
-              onClick={() => onOpen(h.id, query)}
-              className="w-full rounded-lg border border-slate-200 bg-white p-4 text-left transition hover:border-indigo-300 hover:shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-700"
-            >
-              <div className="mb-1.5 flex items-baseline justify-between gap-3">
-                <span className="truncate font-medium">{h.alias || 'Anonymous candidate'}</span>
-                <span className="shrink-0 text-xs text-slate-400">{formatDate(h.posted_at)}</span>
-              </div>
-              <MetaLine t={h} />
-              {h.daf && <p className="mt-2 line-clamp-1 text-sm text-slate-500 dark:text-slate-400">DAF: {h.daf}</p>}
-              <p className="mt-2 line-clamp-3 text-sm whitespace-pre-line text-slate-700 dark:text-slate-300">
-                <Snippet text={h.snippet} />
-              </p>
-            </button>
+            <TranscriptCard t={h} snippet={h.snippet} onOpen={() => onOpen(h.id, query)} />
           </li>
         ))}
       </ul>

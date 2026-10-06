@@ -1,24 +1,42 @@
 import axios from 'axios'
-import type { Filters, SearchResponse, Source, Stats, Transcript } from '../types'
+import type { Facets, Filters, SearchResponse, SortOrder, Source, Stats, Transcript } from '../types'
 
 const baseURL = import.meta.env.VITE_API_URL ?? ''
-const http = axios.create({ baseURL })
+// FastAPI reads repeated keys (topic=a&topic=b), not topic[]=a
+const http = axios.create({ baseURL, paramsSerializer: { indexes: null } })
 
 function filterParams(f: Filters) {
   return {
     board: f.board || undefined,
     cse_year: f.cse_year ? Number(f.cse_year) : undefined,
     exam: f.exam || undefined,
+    background: f.background || undefined,
+    optional_tag: f.optional_tag || undefined,
+    state: f.state || undefined,
+    interest: f.interest || undefined,
+    topic: f.topics.length ? f.topics : undefined,
+    has_marks: f.has_marks || undefined,
   }
+}
+
+function filterBody(f: Filters) {
+  const { topic, ...rest } = filterParams(f)
+  return { ...rest, topics: topic ?? [] }
 }
 
 export async function getStats(): Promise<Stats> {
   return (await http.get<Stats>('/api/stats')).data
 }
 
-export async function searchTranscripts(q: string, filters: Filters, offset = 0, limit = 20): Promise<SearchResponse> {
-  const params = { q, limit, offset, ...filterParams(filters) }
+export async function searchTranscripts(
+  q: string, filters: Filters, offset = 0, limit = 20, sort: SortOrder = 'recent',
+): Promise<SearchResponse> {
+  const params = { q, limit, offset, sort, ...filterParams(filters) }
   return (await http.get<SearchResponse>('/api/search', { params })).data
+}
+
+export async function getFacets(filters: Filters): Promise<Facets> {
+  return (await http.get<Facets>('/api/facets', { params: filterParams(filters) })).data
 }
 
 export async function getTranscript(id: string): Promise<Transcript> {
@@ -37,7 +55,7 @@ export async function ask(question: string, filters: Filters, handlers: AskHandl
   const res = await fetch(`${baseURL}/api/ask`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ question, filters: filterParams(filters) }),
+    body: JSON.stringify({ question, filters: filterBody(filters) }),
     signal,
   })
   if (!res.ok || !res.body) {

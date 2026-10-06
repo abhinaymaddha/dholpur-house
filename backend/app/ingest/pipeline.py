@@ -14,6 +14,7 @@ from datetime import datetime
 from pathlib import Path
 
 from psycopg import connect
+from psycopg.types.json import Jsonb
 
 from app.config import settings
 from app.database import init_schema
@@ -21,6 +22,8 @@ from app.services.embeddings import embed
 
 from .parse import parse_export
 from .segment import build_units, dedupe
+from .structure import question_count, structure
+from .tags import tag_transcript
 from .transcripts import chunks, classify, metadata
 
 
@@ -62,7 +65,11 @@ def run_ingest(source: Path, log: Callable[[str], None] = print) -> dict:
     rows, chunk_rows = [], []
     for u in accepted:
         meta = metadata(u)
+        outline = structure(u["text"])
         rows.append({
+            **tag_transcript(u["text"], meta["daf"], meta["optional_subject"]),
+            "structure": Jsonb(outline),
+            "question_count": question_count(outline),
             "id": u["unit_id"], "message_ids": u["message_ids"],
             "posted_at": datetime.fromisoformat(u["posted_at"]),
             "telegram_url": f"{settings.telegram_channel}/{u['message_ids'][0]}",
@@ -79,10 +86,12 @@ def run_ingest(source: Path, log: Callable[[str], None] = print) -> dict:
         with conn.cursor() as cur:
             cur.executemany(
                 "INSERT INTO transcripts (id, message_ids, posted_at, telegram_url, board, alias, interview_date, daf,"
-                " optional_subject, pt_marks, exam, cse_year, reactions, duplicates, text) VALUES"
+                " optional_subject, pt_marks, exam, cse_year, reactions, duplicates, text, background, optional_tag,"
+                " states, interests, topics, question_count, structure) VALUES"
                 " (%(id)s, %(message_ids)s, %(posted_at)s, %(telegram_url)s, %(board)s, %(alias)s, %(interview_date)s,"
                 " %(daf)s, %(optional_subject)s, %(pt_marks)s, %(exam)s, %(cse_year)s, %(reactions)s, %(duplicates)s,"
-                " %(text)s)", rows)
+                " %(text)s, %(background)s, %(optional_tag)s, %(states)s, %(interests)s, %(topics)s,"
+                " %(question_count)s, %(structure)s)", rows)
             cur.executemany(
                 "INSERT INTO held (id, reason, message_ids, posted_at, text) VALUES (%s, %s, %s, %s, %s)",
                 [(u["unit_id"], r, u["message_ids"], datetime.fromisoformat(u["posted_at"]), u["text"])

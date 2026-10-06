@@ -1,4 +1,4 @@
-import type { Filters, Stats } from '../types'
+import { emptyFilters, type Filters, type Stats } from '../types'
 
 const select =
   'h-9 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-700 focus:border-indigo-500 focus:outline-none ' +
@@ -32,7 +32,7 @@ export function FiltersBar({ stats, filters, onChange }: {
         ))}
       </select>
       {active && (
-        <button className="text-sm text-indigo-600 hover:underline dark:text-indigo-400" onClick={() => onChange({ board: '', cse_year: '', exam: '' })}>
+        <button className="text-sm text-indigo-600 hover:underline dark:text-indigo-400" onClick={() => onChange(emptyFilters())}>
           Clear filters
         </button>
       )}

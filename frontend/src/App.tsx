@@ -1,14 +1,18 @@
-import { MessageSquareText, Search } from 'lucide-react'
+import { FolderTree, MessageSquareText, Search } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { AskView } from './components/AskView'
+import { BrowseView } from './components/BrowseView'
 import { SearchView } from './components/SearchView'
 import { TranscriptPanel } from './components/TranscriptPanel'
 import { getStats } from './services/api'
 import type { Stats } from './types'
 
-type Tab = 'search' | 'ask'
+type Tab = 'browse' | 'search' | 'ask'
 
-const tabFromHash = (): Tab => (window.location.hash === '#ask' ? 'ask' : 'search')
+const tabFromHash = (): Tab => {
+  const h = window.location.hash.slice(1)
+  return h === 'search' || h === 'ask' ? h : 'browse'
+}
 
 export default function App() {
   const [tab, setTab] = useState<Tab>(tabFromHash)
@@ -28,7 +32,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <header className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-        <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3 px-4 py-4">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4">
           <div>
             <h1 className="text-lg font-semibold tracking-tight">UPSC Interview Transcripts</h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -36,22 +40,25 @@ export default function App() {
             </p>
           </div>
           <nav className="flex rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
+            <TabButton active={tab === 'browse'} href="#browse" icon={<FolderTree size={15} />} label="Browse" />
             <TabButton active={tab === 'search'} href="#search" icon={<Search size={15} />} label="Search" />
             <TabButton active={tab === 'ask'} href="#ask" icon={<MessageSquareText size={15} />} label="Ask" />
           </nav>
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-4 py-6">
+      <main className="mx-auto max-w-6xl px-4 py-6">
         {stats?.transcripts === 0 && (
           <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
             Transcripts are still being loaded (this takes a few minutes on first start). Refresh shortly.
           </p>
         )}
-        {tab === 'search' ? <SearchView stats={stats} onOpen={openTranscript} /> : <AskView stats={stats} onOpen={openTranscript} />}
+        {tab === 'browse' && <BrowseView onOpen={openTranscript} />}
+        {tab === 'search' && <div className="mx-auto max-w-4xl"><SearchView stats={stats} onOpen={openTranscript} /></div>}
+        {tab === 'ask' && <div className="mx-auto max-w-4xl"><AskView stats={stats} onOpen={openTranscript} /></div>}
       </main>
 
-      <footer className="mx-auto max-w-4xl px-4 pb-8 text-xs text-slate-400">
+      <footer className="mx-auto max-w-6xl px-4 pb-8 text-xs text-slate-400">
         Transcripts are candidates' own recollections, shared publicly on Telegram. Answers are AI-generated from them and may be wrong — check the sources.
       </footer>
 

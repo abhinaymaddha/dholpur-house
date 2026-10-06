@@ -11,6 +11,7 @@ import re
 from collections import defaultdict
 
 from app.database import pool
+from app.schemas.filters import TranscriptFilters
 from app.services.embeddings import embed_one
 from app.services.search import filter_sql
 
@@ -33,9 +34,8 @@ def _transcript_score(chunk_scores: list[float]) -> float:
     return best + 0.25 * (sum(chunk_scores) - best)
 
 
-def retrieve(question: str, board: str | None, cse_year: int | None, exam: str | None,
-             top_k: int = 6, chunks_per_transcript: int = 3) -> list[dict]:
-    where, params = filter_sql(board, cse_year, exam)
+def retrieve(question: str, filters: TranscriptFilters, top_k: int = 6, chunks_per_transcript: int = 3) -> list[dict]:
+    where, params = filter_sql(filters)
     params |= {"vec": embed_one(question), "kq": _keyword_query(question), "n": CANDIDATES}
     with pool.connection() as conn:
         conn.execute("SET hnsw.ef_search = 200")   # filters are applied after the ANN scan; widen it
