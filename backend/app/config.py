@@ -40,6 +40,12 @@ class Settings(BaseSettings):
     llm_model: str = Field(default="nvidia/nemotron-3-super-120b-a12b:free", alias="LLM_MODEL")
     llm_max_tokens: int = Field(default=4000, alias="LLM_MAX_TOKENS")
 
+    # Load backend/seed/ automatically when the database has no transcripts
+    seed_on_empty: bool = Field(default=True, alias="SEED_ON_EMPTY")
+
+    # Enables /api/admin (upload a Telegram export to re-ingest). Leave empty to disable.
+    admin_token: str = Field(default="", alias="ADMIN_TOKEN")
+
     # Source channel, used to link each transcript back to its Telegram post
     telegram_channel: str = Field(default="https://t.me/csetranscripts", alias="TELEGRAM_CHANNEL")
 

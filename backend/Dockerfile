@@ -13,6 +13,7 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt
 
 COPY app ./app
+COPY seed ./seed
 
 # Non-root user; /models holds the downloaded embedding model (mount a volume to keep it).
 RUN useradd -m -u 1000 appuser && mkdir -p /models && chown -R appuser:appuser /app /models

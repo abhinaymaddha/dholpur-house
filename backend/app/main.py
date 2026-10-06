@@ -9,11 +9,14 @@ import threading
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from psycopg import connect
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import ask_router, health_router, transcripts_router
+from app.api.routes import admin_router, ask_router, health_router, transcripts_router
 from app.config import settings
 from app.database import init_schema, pool
+from app.ingest.pipeline import SEED_FILE
+from app.services import ingest_job
 from app.services.embeddings import embed_one
 
 logging.basicConfig(
@@ -25,11 +28,18 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    pool.open(wait=True)
-    with pool.connection() as conn:
+    # Create the pgvector extension before the pool opens: pooled connections register the vector type.
+    with connect(settings.database_url, autocommit=True) as conn:
         init_schema(conn)
-    # Load the embedding model in the background so the first /api/ask isn't slow.
-    threading.Thread(target=embed_one, args=("warm up",), daemon=True).start()
+        empty = conn.execute("SELECT NOT EXISTS (SELECT 1 FROM transcripts)").fetchone()[0]
+    pool.open(wait=True)
+    if empty and settings.seed_on_empty and SEED_FILE.exists():
+        # Fresh database: load the committed seed in the background (takes a few minutes).
+        logger.info("Database is empty; loading seed data from %s", SEED_FILE.name)
+        ingest_job.start(SEED_FILE, label=f"seed: {SEED_FILE.name}")
+    else:
+        # Load the embedding model in the background so the first /api/ask isn't slow.
+        threading.Thread(target=embed_one, args=("warm up",), daemon=True).start()
     logger.info("Started %s (LLM: %s)", settings.app_name, settings.llm_model)
     yield
     pool.close()
@@ -45,3 +55,4 @@ app.add_middleware(
 app.include_router(health_router)
 app.include_router(transcripts_router)
 app.include_router(ask_router)
+app.include_router(admin_router)
