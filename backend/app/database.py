@@ -62,6 +62,53 @@ CREATE TABLE IF NOT EXISTS held (
     text        text NOT NULL
 );
 
+-- Every question asked in a transcript, for Interview mode. prev_id links a follow-up to the question before it.
+CREATE TABLE IF NOT EXISTS questions (
+    id            bigserial PRIMARY KEY,
+    transcript_id text NOT NULL REFERENCES transcripts(id) ON DELETE CASCADE,
+    seq           int NOT NULL,
+    member        text NOT NULL,
+    text          text NOT NULL,
+    topics        text[] NOT NULL DEFAULT '{{}}',
+    prev_id       bigint,
+    tsv tsvector GENERATED ALWAYS AS (to_tsvector('english', text)) STORED
+);
+CREATE INDEX IF NOT EXISTS questions_topics ON questions USING gin (topics);
+CREATE INDEX IF NOT EXISTS questions_tsv ON questions USING gin (tsv);
+CREATE INDEX IF NOT EXISTS questions_transcript ON questions (transcript_id);
+
+-- Current-affairs articles (app/services/news.py), tagged with interview topics.
+CREATE TABLE IF NOT EXISTS news_items (
+    url          text PRIMARY KEY,
+    source       text NOT NULL,
+    title        text NOT NULL,
+    summary      text NOT NULL DEFAULT '',
+    published_at timestamptz NOT NULL,
+    topics       text[] NOT NULL
+);
+CREATE INDEX IF NOT EXISTS news_items_topics ON news_items USING gin (topics);
+CREATE TABLE IF NOT EXISTS news_fetches (source text PRIMARY KEY, fetched_at timestamptz NOT NULL);
+
+-- Interview mode conversations. A turn is one question and, once answered, its evaluation.
+CREATE TABLE IF NOT EXISTS interview_sessions (
+    id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS interview_turns (
+    id          bigserial PRIMARY KEY,
+    session_id  uuid NOT NULL REFERENCES interview_sessions(id) ON DELETE CASCADE,
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    main_index  int NOT NULL,          -- 1, 2, 3 ... per main question
+    depth       int NOT NULL,          -- 0 = main question, 1-2 = follow-ups
+    topic       text NOT NULL,
+    question    text NOT NULL,
+    source      jsonb NOT NULL,        -- where the question came from (past transcript, article, DAF, generated)
+    answer      text,
+    evaluation  jsonb,
+    mode        text
+);
+CREATE INDEX IF NOT EXISTS interview_turns_session ON interview_turns (session_id, id);
+
 CREATE TABLE IF NOT EXISTS chunks (
     id            bigserial PRIMARY KEY,
     transcript_id text NOT NULL REFERENCES transcripts(id) ON DELETE CASCADE,

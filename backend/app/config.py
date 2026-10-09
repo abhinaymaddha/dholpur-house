@@ -35,10 +35,10 @@ class Settings(BaseSettings):
     embed_dim: int = Field(default=384, alias="EMBED_DIM")
     embed_cache_dir: str | None = Field(default=None, alias="EMBED_CACHE_DIR")
 
-    # LLM for answers, via OpenRouter
+    # LLMs via OpenRouter. Which model each flow uses is set in models.toml (model_1, model_2, ...).
     openrouter_api_key: str = Field(default="", alias="OPENROUTER_API_KEY")
-    llm_model: str = Field(default="nvidia/nemotron-3-super-120b-a12b:free", alias="LLM_MODEL")
-    llm_max_tokens: int = Field(default=4000, alias="LLM_MAX_TOKENS")
+    models_file: str | None = Field(default=None, alias="MODELS_FILE")     # default: backend/models.toml
+    sources_file: str | None = Field(default=None, alias="SOURCES_FILE")   # default: backend/sources.toml
 
     # Load backend/seed/ automatically when the database has no transcripts
     seed_on_empty: bool = Field(default=True, alias="SEED_ON_EMPTY")

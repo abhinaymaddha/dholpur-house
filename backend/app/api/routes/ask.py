@@ -11,7 +11,8 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse
 
 from app.schemas.ask import AskRequest
-from app.services.llm import LLMError, stream_answer
+from app.services.answer import stream_answer
+from app.services.llm import LLMError
 from app.services.retrieval import retrieve
 
 router = APIRouter(prefix="/api", tags=["ask"])

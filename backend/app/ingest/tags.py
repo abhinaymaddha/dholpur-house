@@ -170,6 +170,11 @@ def _match(compiled: list[tuple[str, re.Pattern]], text: str) -> list[str]:
     return [tag for tag, rx in compiled if rx.search(text)]
 
 
+def match_topics(text: str) -> list[str]:
+    """Topics mentioned at all in a short text (one question, one headline)."""
+    return [tag for tag, rx in _TOPICS if rx.search(text)]
+
+
 def topic_tags(text: str) -> list[str]:
     q = question_text(text)
     return [tag for tag, rx in _TOPICS

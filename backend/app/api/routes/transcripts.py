@@ -2,8 +2,8 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.config import settings
 from app.database import pool
+from app.models_config import get_model
 from app.schemas.filters import TranscriptFilters, filters_query
 from app.schemas.transcript import Facets, SearchResponse, Stats, Transcript
 from app.services.search import facets, search
@@ -52,4 +52,4 @@ def stats():
             ).fetchall()
 
         return {**counts, "boards": facet("board"), "years": facet("cse_year"), "exams": facet("exam"),
-                "llm_model": settings.llm_model}
+                "llm_model": get_model("model_1").id}

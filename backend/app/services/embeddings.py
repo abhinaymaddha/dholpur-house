@@ -13,7 +13,10 @@ from app.config import settings
 @lru_cache(maxsize=1)
 def _model():
     from fastembed import TextEmbedding   # imported lazily: loading the model takes a few seconds
-    return TextEmbedding(settings.embed_model, cache_dir=settings.embed_cache_dir)
+    with warnings.catch_warnings():
+        # fastembed notes this model now uses mean pooling; that is the model's intended pooling, so it's fine
+        warnings.filterwarnings("ignore", message=".*now uses mean pooling.*")
+        return TextEmbedding(settings.embed_model, cache_dir=settings.embed_cache_dir)
 
 
 def embed(texts: list[str], batch_size: int = 64) -> list[np.ndarray]:

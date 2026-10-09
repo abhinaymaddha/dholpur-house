@@ -1,17 +1,18 @@
-import { FolderTree, MessageSquareText, Search } from 'lucide-react'
+import { FolderTree, GraduationCap, MessageSquareText, Search } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { AskView } from './components/AskView'
 import { BrowseView } from './components/BrowseView'
+import { InterviewView } from './components/interview/InterviewView'
 import { SearchView } from './components/SearchView'
 import { TranscriptPanel } from './components/TranscriptPanel'
 import { getStats } from './services/api'
 import type { Stats } from './types'
 
-type Tab = 'browse' | 'search' | 'ask'
+type Tab = 'browse' | 'search' | 'ask' | 'interview'
 
 const tabFromHash = (): Tab => {
   const h = window.location.hash.slice(1)
-  return h === 'search' || h === 'ask' ? h : 'browse'
+  return h === 'search' || h === 'ask' || h === 'interview' ? h : 'browse'
 }
 
 export default function App() {
@@ -43,6 +44,7 @@ export default function App() {
             <TabButton active={tab === 'browse'} href="#browse" icon={<FolderTree size={15} />} label="Browse" />
             <TabButton active={tab === 'search'} href="#search" icon={<Search size={15} />} label="Search" />
             <TabButton active={tab === 'ask'} href="#ask" icon={<MessageSquareText size={15} />} label="Ask" />
+            <TabButton active={tab === 'interview'} href="#interview" icon={<GraduationCap size={15} />} label="Interview" />
           </nav>
         </div>
       </header>
@@ -56,6 +58,7 @@ export default function App() {
         {tab === 'browse' && <BrowseView onOpen={openTranscript} />}
         {tab === 'search' && <div className="mx-auto max-w-4xl"><SearchView stats={stats} onOpen={openTranscript} /></div>}
         {tab === 'ask' && <div className="mx-auto max-w-4xl"><AskView stats={stats} onOpen={openTranscript} /></div>}
+        {tab === 'interview' && <InterviewView stats={stats} onOpen={openTranscript} />}
       </main>
 
       <footer className="mx-auto max-w-6xl px-4 pb-8 text-xs text-slate-400">

@@ -1,0 +1,25 @@
+# Models used by the app, all called through OpenRouter (https://openrouter.ai/models).
+#
+# Code refers to these keys (model_1, model_2, ...), never to a model id, so changing a model
+# here switches every flow that uses it. The file is re-read when it changes; no restart needed.
+#
+#   model_1  Ask tab: answers questions from retrieved transcripts (streamed)
+#   model_2  Interview: writes new questions from current-affairs articles or the candidate's DAF
+#   model_3  Interview: evaluates each answer critically and writes follow-up questions
+#
+# Fields: id (OpenRouter slug), max_tokens, reasoning_effort (low | medium | high), temperature (optional)
+
+[model_1]
+id = "nvidia/nemotron-3-super-120b-a12b:free"
+max_tokens = 4000
+reasoning_effort = "low"
+
+[model_2]
+id = "nvidia/nemotron-3-super-120b-a12b:free"
+max_tokens = 3000
+reasoning_effort = "low"
+
+[model_3]
+id = "nvidia/nemotron-3-super-120b-a12b:free"
+max_tokens = 4000
+reasoning_effort = "medium"

@@ -101,3 +101,61 @@ export interface Source extends TranscriptMeta {
   score: number
   excerpts: { section: string; text: string }[]
 }
+
+// ---------- Interview mode ----------
+
+export interface InterviewTopic {
+  name: string
+  source: 'past' | 'current' | 'mixed' | 'daf'
+  past_questions: number
+  recent_articles: number
+}
+
+export interface InterviewFilters {
+  topics: string[]
+  board: string
+  daf: string
+  source: 'auto' | 'past' | 'current'
+}
+
+export interface Evaluation {
+  scores: Record<string, number>
+  average: number
+  verdict: 'good' | 'partial' | 'weak'
+  critique: string
+  missing_points: string[]
+  model_answer_points: string[]
+  skipped?: boolean
+}
+
+export interface Turn {
+  id: number
+  main_index: number
+  depth: number
+  topic: string
+  question: string
+  source: {
+    type: 'past' | 'current' | 'daf' | 'followup'
+    transcript_id?: string
+    board?: string
+    cse_year?: number
+    url?: string
+    title?: string
+    publisher?: string
+    published_at?: string
+    daf_item?: string
+  }
+  answer: string | null
+  evaluation: Evaluation | null
+  mode: string | null
+}
+
+export interface InterviewReport {
+  answered: number
+  skipped: number
+  average: number
+  verdicts: Record<'good' | 'partial' | 'weak', number>
+  dimensions: Record<string, number>
+  topics: { topic: string; answered: number; average: number }[]
+  turns: Turn[]
+}

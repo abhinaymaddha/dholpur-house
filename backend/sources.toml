@@ -1,0 +1,45 @@
+# Current-affairs sources for Interview mode. RSS or Atom feeds only.
+#
+# Each article is tagged with interview topics by the same rules used for transcripts
+# (backend/app/ingest/tags.py, TOPICS). `topics` limits which topics a feed may feed; leave it
+# out to let the rules decide. Feeds are re-fetched when older than `refresh_hours`.
+
+refresh_hours = 6
+keep_days = 21
+
+[[source]]
+name = "The Hindu – International"
+url = "https://www.thehindu.com/news/international/feeder/default.rss"
+topics = ["International Relations", "Security & Defence", "Economy"]
+
+[[source]]
+name = "The Hindu – National"
+url = "https://www.thehindu.com/news/national/feeder/default.rss"
+
+[[source]]
+name = "The Hindu – Editorial"
+url = "https://www.thehindu.com/opinion/editorial/feeder/default.rss"
+
+[[source]]
+name = "The Hindu – Economy"
+url = "https://www.thehindu.com/business/Economy/feeder/default.rss"
+topics = ["Economy", "Agriculture & Rural"]
+
+[[source]]
+name = "The Hindu – Science"
+url = "https://www.thehindu.com/sci-tech/science/feeder/default.rss"
+topics = ["Science & Technology", "Health", "Environment & Disasters"]
+
+[[source]]
+name = "The Hindu – Environment"
+url = "https://www.thehindu.com/sci-tech/energy-and-environment/feeder/default.rss"
+topics = ["Environment & Disasters", "Science & Technology"]
+
+[[source]]
+name = "Indian Express – Explained"
+url = "https://indianexpress.com/section/explained/feed/"
+
+[[source]]
+name = "Mint – Economy"
+url = "https://www.livemint.com/rss/economy"
+topics = ["Economy"]
