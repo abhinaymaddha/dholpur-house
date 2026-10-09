@@ -1,4 +1,4 @@
-"""Answer generation over retrieved transcripts, streamed from OpenRouter."""
+"""OpenRouter client used by every LLM flow. Callers pick a model slot from models.toml (model_1, model_2, ...)."""
 
 from __future__ import annotations
 
@@ -8,50 +8,58 @@ from collections.abc import Iterator
 import requests
 
 from app.config import settings
+from app.models_config import get_model
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-
-SYSTEM_PROMPT = """You help UPSC Civil Services aspirants prepare for the Personality Test (interview) using real transcripts that past candidates shared after their interviews.
-
-You are given numbered sources [S1], [S2], ... Each is one candidate's transcript excerpt with its board, date and DAF keywords. Transcripts are written from memory, so treat them as candidate recollections, not official records.
-
-Rules:
-- Answer only from the sources. If they don't contain enough to answer, say so plainly and suggest a better search.
-- Cite sources inline, like [S2] or [S1][S4], right after the claim they support.
-- When listing questions that were asked, quote them closely and say which board or candidate profile they came from.
-- Be concise and practical. Use short bullet lists where they help. No preamble."""
 
 
 class LLMError(RuntimeError):
     pass
 
 
-def build_context(sources: list[dict]) -> str:
-    blocks = []
-    for i, s in enumerate(sources, 1):
-        head = (f"[S{i}] Board: {s['board']} | CSE {s['cse_year']} ({s['exam']}) | Interview date: "
-                f"{s['interview_date'] or 'n/a'} | DAF: {s['daf'] or 'n/a'} | Optional: {s['optional_subject'] or 'n/a'}"
-                + (f" | PT marks: {s['pt_marks']}" if s["pt_marks"] else ""))
-        body = "\n...\n".join(e["text"] for e in s["excerpts"])
-        blocks.append(f"{head}\n{body}")
-    return "\n\n---\n\n".join(blocks)
+def _body(model_key: str, messages: list[dict], **extra) -> dict:
+    m = get_model(model_key)
+    body = {"model": m.id, "max_tokens": m.max_tokens, "messages": messages, **extra}
+    if m.reasoning_effort:
+        body["reasoning"] = {"effort": m.reasoning_effort, "exclude": True}
+    if m.temperature is not None:
+        body["temperature"] = m.temperature
+    return body
 
 
-def stream_answer(question: str, sources: list[dict]) -> Iterator[str]:
+def _headers() -> dict:
     if not settings.openrouter_api_key:
         raise LLMError("OPENROUTER_API_KEY is not configured on the server")
-    body = {
-        "model": settings.llm_model,
-        "stream": True,
-        "max_tokens": settings.llm_max_tokens,
-        "reasoning": {"effort": "low", "exclude": True},
-        "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"Sources:\n\n{build_context(sources)}\n\nQuestion: {question}"},
-        ],
-    }
-    headers = {"Authorization": f"Bearer {settings.openrouter_api_key}", "X-Title": settings.app_name}
-    with requests.post(OPENROUTER_URL, json=body, headers=headers, stream=True, timeout=(10, 300)) as r:
+    return {"Authorization": f"Bearer {settings.openrouter_api_key}", "X-Title": settings.app_name}
+
+
+def complete_json(model_key: str, messages: list[dict], schema: dict, name: str) -> dict:
+    """One non-streamed call that must return JSON matching `schema` (OpenRouter structured outputs)."""
+    body = _body(model_key, messages, response_format={
+        "type": "json_schema", "json_schema": {"name": name, "strict": True, "schema": schema}})
+    body["provider"] = {"require_parameters": True}   # only providers that honour response_format
+    try:
+        r = requests.post(OPENROUTER_URL, json=body, headers=_headers(), timeout=(10, 300))
+    except requests.RequestException as e:
+        raise LLMError(f"Could not reach OpenRouter: {e}") from e
+    if r.status_code != 200:
+        raise LLMError(f"OpenRouter returned {r.status_code}: {r.text[:300]}")
+    data = r.json()
+    if "error" in data:
+        raise LLMError(str(data["error"].get("message", data["error"])))
+    choice = data["choices"][0]
+    if choice.get("finish_reason") not in ("stop", "end_turn"):
+        raise LLMError(f"The model stopped early ({choice.get('finish_reason')}); try again")
+    try:
+        return json.loads(choice["message"]["content"])
+    except (TypeError, json.JSONDecodeError) as e:
+        raise LLMError("The model returned malformed JSON; try again") from e
+
+
+def stream_text(model_key: str, messages: list[dict]) -> Iterator[str]:
+    """Stream plain-text deltas."""
+    body = _body(model_key, messages, stream=True)
+    with requests.post(OPENROUTER_URL, json=body, headers=_headers(), stream=True, timeout=(10, 300)) as r:
         if r.status_code != 200:
             raise LLMError(f"OpenRouter returned {r.status_code}: {r.text[:300]}")
         r.encoding = "utf-8"   # text/event-stream has no charset, and requests would assume Latin-1

@@ -12,11 +12,12 @@ from fastapi import FastAPI
 from psycopg import connect
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import admin_router, ask_router, health_router, transcripts_router
+from app.api.routes import admin_router, ask_router, health_router, interview_router, transcripts_router
 from app.config import settings
 from app.database import init_schema, pool
 from app.ingest.pipeline import SEED_FILE
-from app.services import ingest_job
+from app.models_config import all_models
+from app.services import ingest_job, news
 from app.services.embeddings import embed_one
 
 logging.basicConfig(
@@ -40,7 +41,8 @@ async def lifespan(app: FastAPI):
     else:
         # Load the embedding model in the background so the first /api/ask isn't slow.
         threading.Thread(target=embed_one, args=("warm up",), daemon=True).start()
-    logger.info("Started %s (LLM: %s)", settings.app_name, settings.llm_model)
+    news.refresh_in_background()   # current-affairs feeds for Interview mode
+    logger.info("Started %s (models: %s)", settings.app_name, {k: m.id for k, m in all_models().items()})
     yield
     pool.close()
 
@@ -55,4 +57,5 @@ app.add_middleware(
 app.include_router(health_router)
 app.include_router(transcripts_router)
 app.include_router(ask_router)
+app.include_router(interview_router)
 app.include_router(admin_router)

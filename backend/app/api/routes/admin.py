@@ -15,7 +15,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile, status
 
 from app.config import settings
-from app.services import ingest_job
+from app.services import ingest_job, news
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -69,3 +69,9 @@ def start_ingest(files: list[UploadFile] = File(..., description="messages.html 
 @router.get("/ingest", dependencies=[Depends(require_admin)])
 def ingest_status():
     return ingest_job.status()
+
+
+@router.post("/news/refresh", dependencies=[Depends(require_admin)])
+def refresh_news():
+    """Re-fetch every current-affairs feed in sources.toml now."""
+    return news.refresh(force=True)

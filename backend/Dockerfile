@@ -13,6 +13,7 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt
 
 COPY app ./app
+COPY models.toml sources.toml ./
 COPY seed ./seed
 
 # Non-root user; /models holds the downloaded embedding model (mount a volume to keep it).

@@ -3,7 +3,9 @@
 Search and ask questions over UPSC Civil Services **Personality Test (interview) transcripts** that past candidates shared publicly on Telegram.
 
 - **Keyword search** across every transcript, with filters for board, exam year and exam (CSE / IFoS), and highlighted matches.
+- **Browse** by exam year → board and by tags (background, optional, home state, interests, topics asked), with a formatted reader.
 - **Ask**: type a question, the app retrieves the most relevant transcripts and an LLM answers from them with inline citations you can open.
+- **Interview**: practise with an AI board. Pick topics; questions come from real past interviews or, for news-heavy topics, from current affairs. Every answer is evaluated critically; a good answer earns up to two follow-ups. Coach mode shows feedback after each answer, Exam mode only in the end report.
 
 > Transcripts are candidates' own recollections. Answers are generated from them and can be wrong, so always check the cited sources.
 
@@ -54,7 +56,7 @@ Every ingest replaces all data with the given messages.
 Requirements: Docker with Compose, and an [OpenRouter API key](https://openrouter.ai/keys).
 
 ```bash
-cp backend/.env.example backend/.env        # set OPENROUTER_API_KEY (and LLM_MODEL if you like)
+cp backend/.env.example backend/.env        # set OPENROUTER_API_KEY
 docker compose up -d --build                # db + backend + frontend on http://localhost:8710
 ```
 
@@ -67,7 +69,6 @@ The first start loads the seed data and downloads the embedding model (~220 MB) 
    ```
    POSTGRES_PASSWORD=<long random string>
    OPENROUTER_API_KEY=<key>
-   LLM_MODEL=nvidia/nemotron-3-super-120b-a12b:free
    ADMIN_TOKEN=<long random string>        # optional, enables /api/admin/ingest
    ```
 3. Domains: service `frontend`, port `80`, HTTPS on.
@@ -75,9 +76,31 @@ The first start loads the seed data and downloads the embedding model (~220 MB) 
 
 Plan for about 2 GB of RAM (embedding model + Postgres).
 
-### Choosing the LLM
+### Models
 
-`LLM_MODEL` is any OpenRouter model slug. The default is a free model (`nvidia/nemotron-3-super-120b-a12b:free`); free models are limited to 50 requests a day on accounts without credits. Stronger models (for example `anthropic/claude-sonnet-5.5`) give noticeably better answers.
+All LLM calls go through OpenRouter. `backend/models.toml` defines numbered slots, and code refers only to the slot:
+
+| Slot | Used for |
+|---|---|
+| `model_1` | Ask: answers from retrieved transcripts |
+| `model_2` | Interview: new questions from current affairs or the candidate's DAF |
+| `model_3` | Interview: critical evaluation of each answer and follow-up questions |
+
+Change a model id there and every flow using that slot switches; the file is re-read on change. The defaults are a
+free model, limited to 50 requests a day on accounts without credits; the evaluator in particular benefits from a stronger model.
+
+## Interview mode
+
+- **Topics and prompts:** `backend/app/interview/prompts/topics/*.md`, one file per topic. The header sets where
+  questions come from (`past`, `current`, `mixed` with `current_share`, or `daf`); the body is the guidance the
+  question writer and evaluator see. `question_current.md`, `question_daf.md` and `evaluate.md` are the templates.
+  Every call adds real questions from past transcripts on that topic (and the chosen board's style), so prompts stay
+  grounded in how boards actually ask. Prompt files are read on every call: edit and try again, no restart.
+- **Current affairs:** `backend/sources.toml` lists RSS/Atom feeds. Articles are tagged with topics by the same rules
+  as transcripts and refreshed every few hours (or `POST /api/admin/news/refresh`).
+- **Rules (in code, `app/interview/engine.py`):** an answer is "good" only if every score is at least 3 and the average
+  at least 3.5; good answers get up to two follow-ups, anything else gets critique and the next question. Past
+  questions are drawn without an LLM call; each answer costs one call.
 
 ## Develop
 

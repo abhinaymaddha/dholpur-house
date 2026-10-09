@@ -1,5 +1,8 @@
 import axios from 'axios'
-import type { Facets, Filters, SearchResponse, SortOrder, Source, Stats, Transcript } from '../types'
+import type {
+  Evaluation, Facets, Filters, InterviewFilters, InterviewReport, InterviewTopic, SearchResponse, SortOrder, Source, Stats,
+  Transcript, Turn,
+} from '../types'
 
 const baseURL = import.meta.env.VITE_API_URL ?? ''
 // FastAPI reads repeated keys (topic=a&topic=b), not topic[]=a
@@ -84,4 +87,42 @@ export async function ask(question: string, filters: Filters, handlers: AskHandl
     }
   }
   if (!finished) handlers.onDone()
+}
+
+// ---------- Interview mode ----------
+
+function interviewBody(f: InterviewFilters) {
+  return { topics: f.topics, board: f.board || null, daf: f.daf.trim() || null, source: f.source }
+}
+
+/** Interview calls can fail with a readable reason (no topic picked, model error, ...). */
+function detail(e: unknown): Error {
+  const msg = axios.isAxiosError(e) ? e.response?.data?.detail ?? e.message : String(e)
+  return new Error(typeof msg === 'string' ? msg : JSON.stringify(msg))
+}
+
+export async function getInterviewTopics(): Promise<InterviewTopic[]> {
+  return (await http.get<InterviewTopic[]>('/api/interview/topics')).data
+}
+
+export async function interviewNext(sessionId: string | null, filters: InterviewFilters): Promise<{ session_id: string; turn: Turn }> {
+  try {
+    return (await http.post('/api/interview/next', { session_id: sessionId, filters: interviewBody(filters) })).data
+  } catch (e) { throw detail(e) }
+}
+
+export async function interviewAnswer(
+  sessionId: string, answer: string, mode: 'coach' | 'exam', filters: InterviewFilters,
+): Promise<{ evaluation: Evaluation; next: Turn }> {
+  try {
+    return (await http.post('/api/interview/answer', { session_id: sessionId, answer, mode, filters: interviewBody(filters) })).data
+  } catch (e) { throw detail(e) }
+}
+
+export async function getInterviewSession(sessionId: string): Promise<Turn[]> {
+  return (await http.get<Turn[]>(`/api/interview/sessions/${sessionId}`)).data
+}
+
+export async function getInterviewReport(sessionId: string): Promise<InterviewReport> {
+  return (await http.get<InterviewReport>(`/api/interview/sessions/${sessionId}/report`)).data
 }

@@ -23,7 +23,7 @@ from app.services.embeddings import embed
 from .parse import parse_export
 from .segment import build_units, dedupe
 from .structure import question_count, structure
-from .tags import tag_transcript
+from .tags import match_topics, tag_transcript
 from .transcripts import chunks, classify, metadata
 
 
@@ -48,6 +48,24 @@ def write_messages(msgs: list[dict], path: Path) -> None:
             f.write(json.dumps(m, ensure_ascii=False, sort_keys=True) + "\n")
 
 
+def _questions(transcript_id: str, outline: dict, start_id: int) -> list[dict]:
+    """Questions from the member sections of an outline. prev_id points to the previous question by the same member."""
+    rows = []
+    for section in outline["sections"]:
+        if not (section["member"] or section["title"] == "Questions"):
+            continue
+        prev = None
+        for item in section["items"]:
+            if item["kind"] != "q" or len(item["text"]) < 8:
+                continue
+            qid = start_id + len(rows)
+            rows.append({"id": qid, "transcript_id": transcript_id, "seq": len(rows),
+                         "member": section["member"] or "Unknown", "text": item["text"][:1000],
+                         "topics": match_topics(item["text"]), "prev_id": prev})
+            prev = qid
+    return rows
+
+
 def run_ingest(source: Path, log: Callable[[str], None] = print) -> dict:
     t0 = time.time()
     msgs = load_messages(source)
@@ -62,7 +80,7 @@ def run_ingest(source: Path, log: Callable[[str], None] = print) -> dict:
     log(f"{len(msgs)} messages | {len(noise)} noise | {n_units} units | {len(units)} after dedupe")
     log(f"accepted {len(accepted)} | held {len(held)}: {held_reasons}")
 
-    rows, chunk_rows = [], []
+    rows, chunk_rows, question_rows = [], [], []
     for u in accepted:
         meta = metadata(u)
         outline = structure(u["text"])
@@ -77,12 +95,13 @@ def run_ingest(source: Path, log: Callable[[str], None] = print) -> dict:
         })
         for seq, c in enumerate(chunks(u["text"])):
             chunk_rows.append({"transcript_id": u["unit_id"], "seq": seq, **c})
+        question_rows.extend(_questions(u["unit_id"], outline, start_id=len(question_rows) + 1))
     log(f"{len(chunk_rows)} chunks; embedding...")
     vectors = embed([c["text"] for c in chunk_rows])
 
     with connect(settings.database_url, autocommit=False) as conn:
         init_schema(conn)
-        conn.execute("TRUNCATE chunks, transcripts, held")
+        conn.execute("TRUNCATE questions, chunks, transcripts, held RESTART IDENTITY")
         with conn.cursor() as cur:
             cur.executemany(
                 "INSERT INTO transcripts (id, message_ids, posted_at, telegram_url, board, alias, interview_date, daf,"
@@ -99,12 +118,18 @@ def run_ingest(source: Path, log: Callable[[str], None] = print) -> dict:
             cur.executemany(
                 "INSERT INTO chunks (transcript_id, seq, section, text, embedding) VALUES (%s, %s, %s, %s, %s)",
                 [(c["transcript_id"], c["seq"], c["section"], c["text"], v) for c, v in zip(chunk_rows, vectors)])
+            cur.executemany(
+                "INSERT INTO questions (id, transcript_id, seq, member, text, topics, prev_id)"
+                " VALUES (%(id)s, %(transcript_id)s, %(seq)s, %(member)s, %(text)s, %(topics)s, %(prev_id)s)",
+                question_rows)
+            cur.execute("SELECT setval('questions_id_seq', GREATEST((SELECT max(id) FROM questions), 1))")
         conn.commit()
 
     summary = {
         "messages": len(msgs), "units": len(units), "transcripts": len(rows), "held": len(held),
         "held_reasons": held_reasons, "chunks": len(chunk_rows),
         "boards": dict(Counter(r["board"] for r in rows).most_common()),
+        "questions": len(question_rows),
         "seconds": round(time.time() - t0),
     }
     log(f"loaded {summary['transcripts']} transcripts in {summary['seconds']}s")
