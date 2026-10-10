@@ -26,7 +26,7 @@ def _sse(event: str, data) -> str:
 @router.post("/ask")
 def ask(req: AskRequest):
     def events():
-        sources = retrieve(req.question, req.filters, top_k=req.top_k)
+        sources = retrieve(req.question, req.filters, top_k=req.top_k, q=req.q)
         yield _sse("sources", sources)
         if not sources:
             yield _sse("error", "No transcripts matched. Try different words or remove filters.")

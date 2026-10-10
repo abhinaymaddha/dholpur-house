@@ -6,8 +6,10 @@ from fastapi import APIRouter, HTTPException
 
 from app.database import pool
 from app.interview import bank, engine, prompts
+from app.schemas.filters import TranscriptFilters
 from app.schemas.interview import AnswerRequest, AnswerResponse, NextRequest, NextResponse, TopicInfo, Turn
 from app.services.llm import LLMError
+from app.services.retrieval import retrieve
 
 router = APIRouter(prefix="/api/interview", tags=["interview"])
 
@@ -55,3 +57,15 @@ def get_session(session_id: UUID):
 @router.get("/sessions/{session_id}/report")
 def report(session_id: UUID):
     return engine.report(session_id)
+
+
+@router.get("/turns/{turn_id}/similar")
+def similar(turn_id: int):
+    """Coach-mode helper: moments in real transcripts closest to this question (no LLM call)."""
+    with pool.connection() as conn:
+        turn = conn.execute("SELECT question, source FROM interview_turns WHERE id = %s", (turn_id,)).fetchone()
+    if not turn:
+        raise HTTPException(status_code=404, detail="Unknown question")
+    own = turn["source"].get("transcript_id")
+    return retrieve(turn["question"], TranscriptFilters(), top_k=4, chunks_per_transcript=1,
+                    exclude=(own,) if own else ())

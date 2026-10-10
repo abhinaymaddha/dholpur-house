@@ -3,8 +3,8 @@
 Search and ask questions over UPSC Civil Services **Personality Test (interview) transcripts** that past candidates shared publicly on Telegram.
 
 - **Browse**: keyword search across every transcript, combined with drill-down by exam year → board and tags (background, optional, home state, interests, topics asked); highlighted matches and a formatted reader.
-- **Ask**: type a question, the app retrieves the most relevant transcripts and an LLM answers from them with inline citations you can open.
-- **Interview**: practise with an AI board. Pick topics; questions come from real past interviews or, for news-heavy topics, from current affairs. Every answer is evaluated critically; a good answer earns up to two follow-ups. Coach mode shows feedback after each answer, Exam mode only in the end report.
+- **Ask AI** (in Browse): ask a question and an LLM answers from the transcripts matching your current search and filters, with inline citations you can open.
+- **Interview**: practise with an AI board. Pick topics; questions come from real past interviews or, for news-heavy topics, from current affairs. Every answer is evaluated critically; a good answer earns up to two follow-ups. Coach mode shows feedback after each answer (and a "How have boards asked this?" helper with similar moments from real transcripts); Exam mode only in the end report.
 
 > Transcripts are candidates' own recollections. Answers are generated from them and can be wrong, so always check the cited sources.
 
@@ -27,7 +27,7 @@ Postgres + pgvector
    ▼
 FastAPI  /api/search  /api/transcripts/{id}  /api/stats  /api/ask (server-sent events)
    ▼
-React (Vite + Tailwind)  Browse (search + filters) · Ask · Interview · transcript reader
+React (Vite + Tailwind)  Browse (search + filters + Ask AI) · Interview · transcript reader
 ```
 
 **Retrieval for Ask** runs vector similarity and full-text match over chunks, fuses the two rankings (reciprocal rank fusion), groups by transcript, and sends the top transcripts' best sections to the LLM via [OpenRouter](https://openrouter.ai). Embeddings are computed locally with [fastembed](https://github.com/qdrant/fastembed) (`paraphrase-multilingual-MiniLM-L12-v2`, handles Hindi), so only answer generation needs an API key.
@@ -81,7 +81,7 @@ All LLM calls go through OpenRouter. `backend/models.toml` defines numbered slot
 
 | Slot | Used for |
 |---|---|
-| `model_1` | Ask: answers from retrieved transcripts |
+| `model_1` | Ask AI (Browse): answers from retrieved transcripts |
 | `model_2` | Interview: new questions from current affairs or the candidate's DAF |
 | `model_3` | Interview: critical evaluation of each answer and follow-up questions |
 
@@ -146,7 +146,7 @@ backend/
   tests/
 frontend/
   src/
-    components/        BrowseView, AskView, interview/, TranscriptPanel, ...
+    components/        BrowseView, AskPanel, interview/, TranscriptPanel, ...
     services/api.ts    API client (incl. the server-sent events reader)
     lib/ hooks/ types/
 docker-compose.yml       local stack (publishes :8710)

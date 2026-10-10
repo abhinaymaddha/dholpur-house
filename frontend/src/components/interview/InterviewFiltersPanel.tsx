@@ -1,4 +1,5 @@
 import { Newspaper } from 'lucide-react'
+import type { Dispatch, SetStateAction } from 'react'
 import type { InterviewFilters, InterviewTopic, Stats } from '../../types'
 
 const GROUPS: { label: string; hint: string; match: (t: InterviewTopic) => boolean }[] = [
@@ -12,11 +13,13 @@ export function InterviewFiltersPanel({ topics, stats, filters, onChange }: {
   topics: InterviewTopic[]
   stats: Stats | null
   filters: InterviewFilters
-  onChange: (f: InterviewFilters) => void
+  onChange: Dispatch<SetStateAction<InterviewFilters>>
 }) {
-  const set = (patch: Partial<InterviewFilters>) => onChange({ ...filters, ...patch })
-  const toggle = (name: string) =>
-    set({ topics: filters.topics.includes(name) ? filters.topics.filter((t) => t !== name) : [...filters.topics, name] })
+  // Functional updates, so two quick changes can't overwrite each other.
+  const set = (patch: Partial<InterviewFilters>) => onChange((f) => ({ ...f, ...patch }))
+  const toggle = (name: string) => onChange((f) => ({
+    ...f, topics: f.topics.includes(name) ? f.topics.filter((t) => t !== name) : [...f.topics, name],
+  }))
   const dafChosen = filters.topics.includes('DAF & Background')
 
   return (
