@@ -1,7 +1,6 @@
 ---
 topic: Environment & Disasters
-source: mixed
-current_share: 0.5
+news: yes        # include recent current-affairs articles when writing questions
 ---
 ## What the board is testing
 Balancing development with sustainability, India's climate commitments, and disaster preparedness on the ground.

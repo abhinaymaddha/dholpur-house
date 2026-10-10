@@ -1,7 +1,6 @@
 ---
 topic: Governance & Administration
-source: past
-current_share: 0.0
+news: no
 ---
 ## What the board is testing
 How the candidate would run things as an officer: implementation, accountability, citizen focus and working within rules.

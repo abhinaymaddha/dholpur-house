@@ -8,7 +8,7 @@ class InterviewFilters(BaseModel):
     topics: list[str] = []
     board: str | None = None
     daf: str | None = Field(default=None, max_length=2000)
-    source: Literal["auto", "past", "current"] = "auto"
+    question_mode: Literal["generated", "real"] = "generated"   # real = past questions only, no LLM call
 
 
 class NextRequest(BaseModel):
@@ -47,6 +47,18 @@ class AnswerResponse(BaseModel):
 
 class TopicInfo(BaseModel):
     name: str
-    source: str
+    news: bool
+    needs_daf: bool
     past_questions: int
     recent_articles: int
+
+
+class SimilarQuestion(BaseModel):
+    id: int
+    text: str
+    follow_up: str | None
+    member: str
+    transcript_id: str
+    board: str
+    cse_year: int
+    alias: str | None

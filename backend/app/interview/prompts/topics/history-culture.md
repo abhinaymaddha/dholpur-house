@@ -1,7 +1,6 @@
 ---
 topic: History & Culture
-source: past
-current_share: 0.0
+news: no
 ---
 ## What the board is testing
 Depth on India's history and heritage, especially linked to the candidate's region and DAF, and its relevance today.

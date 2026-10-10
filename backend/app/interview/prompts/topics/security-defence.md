@@ -1,7 +1,6 @@
 ---
 topic: Security & Defence
-source: mixed
-current_share: 0.6
+news: yes        # include recent current-affairs articles when writing questions
 ---
 ## What the board is testing
 Strategic thinking about internal and external security, civil–military aspects and India's posture.

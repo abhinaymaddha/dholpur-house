@@ -1,7 +1,6 @@
 ---
 topic: Education
-source: past
-current_share: 0.0
+news: no
 ---
 ## What the board is testing
 Views on school and higher education quality, NEP, coaching culture and learning outcomes.

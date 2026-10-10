@@ -33,8 +33,12 @@ def _obj(props: dict) -> dict:
     return {"type": "object", "properties": props, "required": list(props), "additionalProperties": False}
 
 
-CURRENT_QUESTION_SCHEMA = _obj({"question": {"type": "string"}, "article_url": {"type": "string"}})
-DAF_QUESTION_SCHEMA = _obj({"question": {"type": "string"}, "daf_item": {"type": "string"}})
+QUESTION_SCHEMA = _obj({
+    "question": {"type": "string"},
+    "angle": {"type": "string", "enum": ["news", "daf", "topic"]},
+    "based_on": {"type": "string"},
+    "article_url": {"type": ["string", "null"]},
+})
 EVALUATION_SCHEMA = _obj({
     "scores": _obj({k: {"type": "integer"} for k in SCORE_KEYS}),
     "verdict": {"type": "string", "enum": ["good", "partial", "weak"]},
@@ -82,69 +86,70 @@ def _pick_topic(chosen: list[str], main_index: int) -> prompts.Topic:
     return all_topics[valid[(main_index - 1) % len(valid)]]   # rotate through the chosen topics
 
 
-def _source_kind(topic: prompts.Topic, preference: str, daf: str | None) -> str:
-    if topic.source == "daf":
-        if not daf:
-            raise InterviewError("Add your DAF details in the filters to be asked DAF-based questions")
-        return "daf"
-    if preference == "past":
-        return "past"
-    if preference == "current":   # only topics configured for current affairs have articles to draw on
-        return "current" if topic.source in ("current", "mixed") else "past"
-    if topic.source == "current":
-        return "current"
-    if topic.source == "mixed":
-        return "current" if random.random() < topic.current_share else "past"
-    return "past"
-
-
-def _board_style(board: str | None) -> str:
+def _persona(board: str | None) -> str:
     if not board:
-        return ""
-    return f"\n## Style of the {board} board\nQuestions this board has asked (any topic):\n{bank.fmt(bank.board_examples(board))}\n"
+        return "A typical UPSC board: a chairperson and four members, courteous but probing."
+    return (f"The {board} board. Questions it has asked (any topic), to show its style and tone:\n"
+            f"{bank.fmt(bank.board_examples(board), with_follow_up=False)}")
 
 
 def _asked(turns: list[dict]) -> str:
     return "\n".join(f"- {t['question']}" for t in turns) or "- (nothing yet)"
 
 
-def _current_question(topic: prompts.Topic, board: str | None, turns: list[dict]) -> tuple[str, dict] | None:
-    used = [t["source"].get("url") for t in turns if t["source"].get("url")]
-    articles = news.recent([topic.name], limit=8, exclude_urls=used)
-    if not articles:
-        return None
+def _used_question_ids(turns: list[dict]) -> list[int]:
+    ids = []
+    for t in turns:
+        src = t["source"]
+        ids += ([src["question_id"]] if src.get("question_id") else []) + src.get("examples", [])
+    return ids
+
+
+def _queries(topic: prompts.Topic, daf: str | None, articles: list[dict]) -> list[str]:
+    """What to search past questions for: the topic itself, the DAF, and the headlines on offer."""
+    queries = [f"{topic.name}. {topic.testing}"]
+    if daf and (topic.needs_daf or random.random() < 0.5):
+        queries.append(daf)
+    queries += [a["title"] for a in articles[:3]]
+    return queries
+
+
+def _generated_question(topic: prompts.Topic, board: str | None, daf: str | None,
+                        turns: list[dict]) -> tuple[str, dict]:
+    """A new question written by model_2 from the topic, DAF, news and similar real questions."""
+    used_urls = [t["source"].get("url") for t in turns if t["source"].get("url")]
+    articles = news.recent([topic.name], limit=6, exclude_urls=used_urls) if topic.news else []
+    examples = bank.similar(_queries(topic, daf, articles), n=15, board=board, exclude_ids=_used_question_ids(turns))
+    candidates = bank.similar_candidates(daf) if daf else []
     listing = "\n".join(f"- [{a['published_at']:%d %b}] {a['title']} ({a['source']})\n  {a['summary'][:400]}\n  url: {a['url']}"
-                        for a in articles)
-    prompt = prompts.render("question_current", topic=topic.name, guidance=topic.guidance,
-                            past_questions=bank.fmt(bank.examples(topic.name, board)),
-                            board_style=_board_style(board), articles=listing, asked=_asked(turns))
-    out = complete_json(QUESTION_MODEL, [{"role": "user", "content": prompt}], CURRENT_QUESTION_SCHEMA, "question")
-    article = next((a for a in articles if a["url"] == out["article_url"]), articles[0])
-    return out["question"], {"type": "current", "url": article["url"], "title": article["title"],
-                             "summary": article["summary"][:600],
-                             "publisher": article["source"], "published_at": article["published_at"].isoformat()}
+                        for a in articles) or "(not used for this topic)"
+    prompt = prompts.render(
+        "question", topic=topic.name, guidance=topic.guidance, daf=daf or "(not provided)", persona=_persona(board),
+        past_questions=bank.fmt(examples), similar_candidates=bank.fmt_candidates(candidates),
+        articles=listing, asked=_asked(turns))
+    out = complete_json(QUESTION_MODEL, [{"role": "user", "content": prompt}], QUESTION_SCHEMA, "question")
+    src = {"type": "generated", "angle": out["angle"], "based_on": out["based_on"],
+           "examples": [e["id"] for e in examples]}
+    article = next((a for a in articles if a["url"] == out.get("article_url")), None)
+    if article:
+        src |= {"url": article["url"], "title": article["title"], "summary": article["summary"][:600],
+                "publisher": article["source"], "published_at": article["published_at"].isoformat()}
+    return out["question"].strip(), src
 
 
-def _daf_question(topic: prompts.Topic, board: str | None, daf: str, turns: list[dict]) -> tuple[str, dict]:
-    prompt = prompts.render("question_daf", guidance=topic.guidance, daf=daf,
-                            past_questions=bank.fmt(bank.examples(topic.name, board, daf=daf)),
-                            board_style=_board_style(board), asked=_asked(turns))
-    out = complete_json(QUESTION_MODEL, [{"role": "user", "content": prompt}], DAF_QUESTION_SCHEMA, "question")
-    return out["question"], {"type": "daf", "daf_item": out["daf_item"]}
-
-
-def _past_question(topic: prompts.Topic, board: str | None, turns: list[dict]) -> tuple[str, dict]:
-    used = [t["source"]["question_id"] for t in turns if t["source"].get("question_id")]
-    q = bank.draw(topic.name, board, used)
-    if not q:
+def _real_question(topic: prompts.Topic, board: str | None, daf: str | None, turns: list[dict]) -> tuple[str, dict]:
+    """A real past question, chosen by meaning (topic, plus DAF when given); no LLM call."""
+    closest = bank.similar(_queries(topic, daf, []), n=25, board=board, exclude_ids=_used_question_ids(turns))
+    if not closest:
         raise InterviewError(f"No past questions found for {topic.name}")
+    q = random.choice(closest[:12])   # some variety among the closest matches
     return q["text"], {"type": "past", "question_id": q["id"], "transcript_id": q["transcript_id"],
                        "board": q["board"], "cse_year": q["cse_year"], "member": q["member"]}
 
 
 def next_question(session_id: UUID | None, topics: list[str], board: str | None, daf: str | None,
-                  source: str = "auto") -> tuple[UUID, dict]:
-    """Start the next main question with the current filters."""
+                  question_mode: str = "generated") -> tuple[UUID, dict]:
+    """Start the next main question with the current filters (generated, or real past questions only)."""
     with pool.connection() as conn:
         session_id = _ensure_session(conn, session_id)
         turns = _turns(conn, session_id)
@@ -154,16 +159,11 @@ def next_question(session_id: UUID | None, topics: list[str], board: str | None,
         _skip_turn(t["id"])
     main_index = max((t["main_index"] for t in turns), default=0) + 1
     topic = _pick_topic(topics, main_index)
-    kind = _source_kind(topic, source, daf)
-
-    result = None
-    if kind == "current":
-        result = _current_question(topic, board, turns)   # None when no recent articles: fall back to past
-    elif kind == "daf":
-        result = _daf_question(topic, board, daf or "", turns)
-    if result is None:
-        result = _past_question(topic, board, turns)
-    question, src = result
+    if topic.needs_daf and not (daf or "").strip():
+        raise InterviewError("Add your DAF details in the filters to be asked DAF-based questions")
+    daf = (daf or "").strip() or None
+    pick = _real_question if question_mode == "real" else _generated_question
+    question, src = pick(topic, board, daf, turns)
     with pool.connection() as conn:
         turn = _add_turn(conn, session_id, main_index, 0, topic.name, question, src)
         conn.commit()
@@ -185,13 +185,19 @@ def _context(turn: dict) -> str:
                 f"{src.get('title')}. {src.get('summary', '')}")
     if src["type"] == "past":
         return f"This is a real question asked in a past interview (CSE {src.get('cse_year')}, {src.get('board')} board)."
+    if src["type"] == "generated":
+        base = f"The board wrote this question for the candidate; it builds on: {src.get('based_on')}."
+        if src.get("title"):
+            base += (f" It draws on this recent news item ({src.get('publisher')}, {src.get('published_at', '')[:10]}): "
+                     f"{src.get('title')}. {src.get('summary', '')}")
+        return base
     if src["type"] == "daf":
         return f"This question is about the candidate's DAF item: {src.get('daf_item')}."
     return "This is a follow-up question."
 
 
 def answer(session_id: UUID, text: str, mode: str, topics: list[str], board: str | None, daf: str | None,
-           source: str = "auto") -> dict:
+           question_mode: str = "generated") -> dict:
     with pool.connection() as conn:
         turns = _turns(conn, session_id)
     pending = next((t for t in reversed(turns) if t["answer"] is None and not (t["evaluation"] or {}).get("skipped")), None)
@@ -204,7 +210,7 @@ def answer(session_id: UUID, text: str, mode: str, topics: list[str], board: str
         for t in chain if t["answer"] or t["id"] == pending["id"])
     followups_left = MAX_FOLLOWUPS - pending["depth"]
     topic = prompts.topic(pending["topic"])
-    pairs = bank.followup_pairs(topic.name)
+    pairs = [(r["text"], r["follow_up"]) for r in bank.similar([pending["question"]], n=12) if r["follow_up"]][:5]
     instruction = (
         f"If (and only if) the verdict is good, write one follow-up question in `follow_up_question` that probes "
         f"deeper into the candidate's answer: challenge a claim they made, ask for a specific example, or push back "
@@ -235,7 +241,7 @@ def answer(session_id: UUID, text: str, mode: str, topics: list[str], board: str
             conn.commit()
             return {"evaluation": evaluation, "next": nxt}
         conn.commit()
-    _, nxt = next_question(session_id, topics, board, daf, source)
+    _, nxt = next_question(session_id, topics, board, daf, question_mode)
     return {"evaluation": evaluation, "next": nxt}
 
 

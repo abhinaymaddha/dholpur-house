@@ -202,6 +202,12 @@ def optional_tag(optional_field: str | None, daf: str | None, header: str) -> st
     return bare[0] if len(bare) == 1 else None
 
 
+def profile_tags(text: str) -> dict:
+    """Background, state, interests and optional read from free text such as a candidate's DAF."""
+    return {"background": _match(_BACKGROUND, text), "states": _match(_STATES, text),
+            "interests": _match(_INTERESTS, text), "optional_tag": optional_tag(None, text, text)}
+
+
 def tag_transcript(text: str, daf: str | None, optional_field: str | None) -> dict:
     header = header_block(text)
     profile = f"{daf or ''}\n{header}"

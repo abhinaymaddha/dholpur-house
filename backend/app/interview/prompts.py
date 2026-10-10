@@ -5,8 +5,8 @@ header block:
 
     ---
     topic: International Relations
-    source: mixed          # past | current | mixed | daf
-    current_share: 0.7     # for mixed: share of main questions drawn from current affairs
+    news: yes          # include recent current-affairs articles when writing questions
+    daf: required      # optional: the topic can't be asked without the candidate's DAF
     ---
 """
 
@@ -24,9 +24,15 @@ _PLACEHOLDER = re.compile(r"\{\{(\w+)\}\}")
 class Topic:
     name: str
     slug: str
-    source: str
-    current_share: float
+    news: bool
+    needs_daf: bool
     guidance: str
+
+    @property
+    def testing(self) -> str:
+        """The 'What the board is testing' paragraph, used as a search query for similar past questions."""
+        part = self.guidance.split("## What the board is testing", 1)[-1]
+        return part.split("##", 1)[0].strip()
 
 
 def render(template: str, **values: str) -> str:
@@ -45,8 +51,8 @@ def _parse(path: Path) -> Topic:
         for line in head.strip().splitlines():
             key, _, value = line.partition(":")
             meta[key.strip()] = value.split("#")[0].strip()
-    return Topic(name=meta.get("topic", path.stem), slug=path.stem, source=meta.get("source", "past"),
-                 current_share=float(meta.get("current_share", 0) or 0), guidance=body.strip())
+    return Topic(name=meta.get("topic", path.stem), slug=path.stem, news=meta.get("news", "no") == "yes",
+                 needs_daf=meta.get("daf") == "required", guidance=body.strip())
 
 
 def topics() -> dict[str, Topic]:

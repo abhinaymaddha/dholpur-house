@@ -98,6 +98,9 @@ def run_ingest(source: Path, log: Callable[[str], None] = print) -> dict:
         question_rows.extend(_questions(u["unit_id"], outline, start_id=len(question_rows) + 1))
     log(f"{len(chunk_rows)} chunks; embedding...")
     vectors = embed([c["text"] for c in chunk_rows])
+    log(f"{len(question_rows)} questions; embedding...")
+    for row, vec in zip(question_rows, embed([r["text"] for r in question_rows])):
+        row["embedding"] = vec
 
     with connect(settings.database_url, autocommit=False) as conn:
         init_schema(conn)
@@ -119,8 +122,8 @@ def run_ingest(source: Path, log: Callable[[str], None] = print) -> dict:
                 "INSERT INTO chunks (transcript_id, seq, section, text, embedding) VALUES (%s, %s, %s, %s, %s)",
                 [(c["transcript_id"], c["seq"], c["section"], c["text"], v) for c, v in zip(chunk_rows, vectors)])
             cur.executemany(
-                "INSERT INTO questions (id, transcript_id, seq, member, text, topics, prev_id)"
-                " VALUES (%(id)s, %(transcript_id)s, %(seq)s, %(member)s, %(text)s, %(topics)s, %(prev_id)s)",
+                "INSERT INTO questions (id, transcript_id, seq, member, text, topics, prev_id, embedding) VALUES"
+                " (%(id)s, %(transcript_id)s, %(seq)s, %(member)s, %(text)s, %(topics)s, %(prev_id)s, %(embedding)s)",
                 question_rows)
             cur.execute("SELECT setval('questions_id_seq', GREATEST((SELECT max(id) FROM questions), 1))")
         conn.commit()
