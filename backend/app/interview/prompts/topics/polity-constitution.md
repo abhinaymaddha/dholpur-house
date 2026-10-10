@@ -1,7 +1,6 @@
 ---
 topic: Polity & Constitution
-source: mixed
-current_share: 0.3
+news: yes        # include recent current-affairs articles when writing questions
 ---
 ## What the board is testing
 Command of constitutional provisions, landmark judgments and how institutions actually work, and the ability to apply them to current controversies.

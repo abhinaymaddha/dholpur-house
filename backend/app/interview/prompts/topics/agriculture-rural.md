@@ -1,7 +1,6 @@
 ---
 topic: Agriculture & Rural
-source: past
-current_share: 0.0
+news: no
 ---
 ## What the board is testing
 Understanding of farm economics, rural livelihoods and the realities behind schemes like MSP, irrigation and cooperatives.

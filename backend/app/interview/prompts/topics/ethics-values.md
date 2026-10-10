@@ -1,7 +1,6 @@
 ---
 topic: Ethics & Values
-source: past
-current_share: 0.0
+news: no
 ---
 ## What the board is testing
 Integrity and judgement in dilemmas, and whether the candidate's values are consistent and practical.

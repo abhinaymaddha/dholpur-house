@@ -1,7 +1,6 @@
 ---
 topic: Situational / Hypothetical
-source: past
-current_share: 0.0
+news: no
 ---
 ## What the board is testing
 Administrative judgement under pressure: what the candidate would actually do as a DM, SP or secretary.

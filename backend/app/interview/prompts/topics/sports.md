@@ -1,7 +1,6 @@
 ---
 topic: Sports
-source: past
-current_share: 0.0
+news: no
 ---
 ## What the board is testing
 Interest and depth in the sports in the DAF, and views on sports governance and policy.

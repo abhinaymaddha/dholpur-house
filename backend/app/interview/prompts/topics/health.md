@@ -1,7 +1,6 @@
 ---
 topic: Health
-source: past
-current_share: 0.0
+news: no
 ---
 ## What the board is testing
 Public health understanding: primary care, financing, nutrition, mental health and delivery gaps.

@@ -1,7 +1,6 @@
 ---
 topic: Society & Social Justice
-source: past
-current_share: 0.0
+news: no
 ---
 ## What the board is testing
 Sensitivity and depth on gender, caste, tribal, ageing, migration and inequality, beyond textbook lines.

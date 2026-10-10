@@ -1,7 +1,7 @@
 import axios from 'axios'
 import type {
-  Evaluation, Facets, Filters, InterviewFilters, InterviewReport, InterviewTopic, SearchResponse, SortOrder, Source, Stats,
-  Transcript, Turn,
+  Evaluation, Facets, Filters, InterviewFilters, InterviewReport, InterviewTopic, SearchResponse, SimilarQuestion, SortOrder,
+  Source, Stats, Transcript, Turn,
 } from '../types'
 
 const baseURL = import.meta.env.VITE_API_URL ?? ''
@@ -92,7 +92,7 @@ export async function ask(question: string, filters: Filters, q: string, handler
 // ---------- Interview mode ----------
 
 function interviewBody(f: InterviewFilters) {
-  return { topics: f.topics, board: f.board || null, daf: f.daf.trim() || null, source: f.source }
+  return { topics: f.topics, board: f.board || null, daf: f.daf.trim() || null, question_mode: f.question_mode }
 }
 
 /** Interview calls can fail with a readable reason (no topic picked, model error, ...). */
@@ -127,6 +127,6 @@ export async function getInterviewReport(sessionId: string): Promise<InterviewRe
   return (await http.get<InterviewReport>(`/api/interview/sessions/${sessionId}/report`)).data
 }
 
-export async function getSimilarMoments(turnId: number): Promise<Source[]> {
-  return (await http.get<Source[]>(`/api/interview/turns/${turnId}/similar`)).data
+export async function getSimilarQuestions(turnId: number): Promise<SimilarQuestion[]> {
+  return (await http.get<SimilarQuestion[]>(`/api/interview/turns/${turnId}/similar`)).data
 }

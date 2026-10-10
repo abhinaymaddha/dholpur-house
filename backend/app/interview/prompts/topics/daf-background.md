@@ -1,7 +1,7 @@
 ---
 topic: DAF & Background
-source: daf
-current_share: 0.0
+news: no
+daf: required    # needs the candidate's DAF
 ---
 ## What the board is testing
 Whether the candidate truly knows their own background: hometown, education, job and hobbies, and can connect them to administration.

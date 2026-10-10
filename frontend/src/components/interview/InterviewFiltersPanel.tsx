@@ -3,9 +3,9 @@ import type { Dispatch, SetStateAction } from 'react'
 import type { InterviewFilters, InterviewTopic, Stats } from '../../types'
 
 const GROUPS: { label: string; hint: string; match: (t: InterviewTopic) => boolean }[] = [
-  { label: 'Current affairs + past interviews', hint: 'Questions from recent news and from past boards', match: (t) => t.source === 'mixed' || t.source === 'current' },
-  { label: 'Past interviews', hint: 'Real questions boards have asked', match: (t) => t.source === 'past' },
-  { label: 'Your DAF', hint: 'Questions on your own background', match: (t) => t.source === 'daf' },
+  { label: 'With current affairs', hint: 'Questions also draw on recent news', match: (t) => t.news },
+  { label: 'Interview topics', hint: 'Grounded in how past boards asked', match: (t) => !t.news && !t.needs_daf },
+  { label: 'Your DAF', hint: 'Questions on your own background', match: (t) => t.needs_daf },
 ]
 
 /** Left rail of Interview mode. Changes apply from the next question; no need to restart. */
@@ -42,7 +42,7 @@ export function InterviewFiltersPanel({ topics, stats, filters, onChange }: {
                       ? 'border-indigo-500 bg-indigo-600 text-white'
                       : 'border-slate-200 text-slate-700 hover:border-indigo-400 dark:border-slate-700 dark:text-slate-300'}`}>
                     {t.name}
-                    {t.recent_articles > 0 && t.source !== 'past' && <Newspaper size={11} className={on ? 'text-indigo-200' : 'text-slate-400'} />}
+                    {t.news && t.recent_articles > 0 && <Newspaper size={11} className={on ? 'text-indigo-200' : 'text-slate-400'} />}
                   </button>
                 )
               })}
@@ -52,16 +52,20 @@ export function InterviewFiltersPanel({ topics, stats, filters, onChange }: {
       })}
 
       <section>
-        <h3 className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">Question source</h3>
+        <h3 className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">Questions</h3>
         <div className="flex rounded-md border border-slate-200 p-0.5 text-xs dark:border-slate-700">
-          {([['auto', 'Auto'], ['past', 'Past interviews'], ['current', 'Current affairs']] as const).map(([v, label]) => (
-            <button key={v} onClick={() => set({ source: v })}
-              className={`flex-1 rounded px-2 py-1 ${filters.source === v ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'text-slate-600 dark:text-slate-400'}`}>
+          {([['generated', 'Generate new questions'], ['real', 'Real past questions only']] as const).map(([v, label]) => (
+            <button key={v} onClick={() => set({ question_mode: v })}
+              className={`flex-1 rounded px-2 py-1 ${filters.question_mode === v ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'text-slate-600 dark:text-slate-400'}`}>
               {label}
             </button>
           ))}
         </div>
-        <p className="mt-1 text-xs text-slate-400">Auto mixes per topic: news-heavy topics lean on current affairs.</p>
+        <p className="mt-1 text-xs text-slate-400">
+          {filters.question_mode === 'generated'
+            ? 'New questions written from your DAF, recent news and similar real questions.'
+            : 'Questions boards actually asked, closest to your topics and DAF. No AI needed to ask.'}
+        </p>
       </section>
 
       <section>
@@ -75,13 +79,15 @@ export function InterviewFiltersPanel({ topics, stats, filters, onChange }: {
 
       <section>
         <h3 className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
-          Your DAF {dafChosen ? '' : <span className="font-normal normal-case">(optional)</span>}
+          Your DAF {dafChosen ? '' : <span className="font-normal normal-case">(recommended)</span>}
         </h3>
         <textarea value={filters.daf} onChange={(e) => set({ daf: e.target.value })} rows={4}
           placeholder="Hometown, state, education, job, hobbies… e.g. Kota, Rajasthan; B.Tech IIT Roorkee; PSIR; chess, cycling"
           className={`w-full resize-y rounded-md border bg-white p-2 text-sm dark:bg-slate-900 ${dafChosen && !filters.daf.trim()
             ? 'border-amber-400' : 'border-slate-300 dark:border-slate-700'}`} />
-        {dafChosen && !filters.daf.trim() && <p className="text-xs text-amber-600">Needed for “Your DAF” questions.</p>}
+        {dafChosen && !filters.daf.trim()
+          ? <p className="text-xs text-amber-600">Needed for “Your DAF” questions.</p>
+          : <p className="text-xs text-slate-400">Personalises questions and finds candidates with a profile like yours.</p>}
       </section>
     </div>
   )

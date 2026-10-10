@@ -1,7 +1,6 @@
 ---
 topic: International Relations
-source: mixed
-current_share: 0.7
+news: yes        # include recent current-affairs articles when writing questions
 ---
 ## What the board is testing
 India's interests and stated positions, reading of the neighbourhood and great-power rivalry, and whether the candidate can hold a balanced view under pressure.

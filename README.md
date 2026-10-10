@@ -4,7 +4,7 @@ Search and ask questions over UPSC Civil Services **Personality Test (interview)
 
 - **Browse**: keyword search across every transcript, combined with drill-down by exam year → board and tags (background, optional, home state, interests, topics asked); highlighted matches and a formatted reader.
 - **Ask AI** (in Browse): ask a question and an LLM answers from the transcripts matching your current search and filters, with inline citations you can open.
-- **Interview**: practise with an AI board. Pick topics; questions come from real past interviews or, for news-heavy topics, from current affairs. Every answer is evaluated critically; a good answer earns up to two follow-ups. Coach mode shows feedback after each answer (and a "How have boards asked this?" helper with similar moments from real transcripts); Exam mode only in the end report.
+- **Interview**: practise with an AI board. Pick topics and add your DAF; the board writes new questions from your DAF, recent news and the most similar real questions from past interviews (or, with a toggle, asks real past questions only). Every answer is evaluated critically; a good answer earns up to two follow-ups. Coach mode shows feedback after each answer (and a "How have boards asked this?" helper with similar moments from real transcripts); Exam mode only in the end report.
 
 > Transcripts are candidates' own recollections. Answers are generated from them and can be wrong, so always check the cited sources.
 
@@ -59,7 +59,8 @@ cp backend/.env.example backend/.env        # set OPENROUTER_API_KEY
 docker compose up -d --build                # db + backend + frontend on http://localhost:8710
 ```
 
-The first start loads the seed data and downloads the embedding model (~220 MB) into a volume.
+The first start loads the seed data (about 12 minutes on a laptop CPU: every transcript section and every question is
+embedded) and downloads the embedding model (~220 MB) into a volume.
 
 ## Deploy with Dokploy
 
@@ -82,7 +83,7 @@ All LLM calls go through OpenRouter. `backend/models.toml` defines numbered slot
 | Slot | Used for |
 |---|---|
 | `model_1` | Ask AI (Browse): answers from retrieved transcripts |
-| `model_2` | Interview: new questions from current affairs or the candidate's DAF |
+| `model_2` | Interview: writes new questions from topic, DAF, news and similar past questions |
 | `model_3` | Interview: critical evaluation of each answer and follow-up questions |
 
 Change a model id there and every flow using that slot switches; the file is re-read on change. The defaults are a
@@ -90,16 +91,23 @@ free model, limited to 50 requests a day on accounts without credits; the evalua
 
 ## Interview mode
 
-- **Topics and prompts:** `backend/app/interview/prompts/topics/*.md`, one file per topic. The header sets where
-  questions come from (`past`, `current`, `mixed` with `current_share`, or `daf`); the body is the guidance the
-  question writer and evaluator see. `question_current.md`, `question_daf.md` and `evaluate.md` are the templates.
-  Every call adds real questions from past transcripts on that topic (and the chosen board's style), so prompts stay
-  grounded in how boards actually ask. Prompt files are read on every call: edit and try again, no restart.
+- **How questions are made (default):** for each question, `model_2` gets the topic guidance, your DAF, the chosen
+  board's style, recent articles (for news topics), about 15 real past questions closest in meaning to the topic,
+  your DAF and the headlines (each with the follow-up the board asked next), and the full question lists of two
+  candidates whose profile best matches your DAF. It writes one new question in that style
+  (`prompts/question.md`).
+- **Real past questions only:** a toggle that skips generation and asks the closest real questions directly; no LLM call.
+- **Question search:** every question from every transcript is embedded at ingest (`questions.embedding`), so "similar
+  questions" means similar in meaning, not just sharing a tag. Profile and board stay transcript-level tags.
+- **Topics and prompts:** `backend/app/interview/prompts/topics/*.md`, one file per topic. The header says whether the
+  topic uses current affairs (`news: yes`) or needs the DAF (`daf: required`); the body is the guidance the question
+  writer and evaluator see. `question.md` and `evaluate.md` are the templates. Prompt files are read on every call:
+  edit and try again, no restart.
 - **Current affairs:** `backend/sources.toml` lists RSS/Atom feeds. Articles are tagged with topics by the same rules
   as transcripts and refreshed every few hours (or `POST /api/admin/news/refresh`).
 - **Rules (in code, `app/interview/engine.py`):** an answer is "good" only if every score is at least 3 and the average
-  at least 3.5; good answers get up to two follow-ups, anything else gets critique and the next question. Past
-  questions are drawn without an LLM call; each answer costs one call.
+  at least 3.5; good answers get up to two follow-ups, anything else gets critique and the next question. Each answer
+  costs one LLM call (`model_3`); follow-up examples come from the real questions most similar to the one asked.
 
 ## Develop
 

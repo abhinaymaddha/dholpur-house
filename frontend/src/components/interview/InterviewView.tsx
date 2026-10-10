@@ -1,15 +1,15 @@
 import { ClipboardList, ExternalLink, History, Loader2, Play, RotateCcw, Send, SkipForward, SlidersHorizontal } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import {
-  getInterviewReport, getInterviewSession, getInterviewTopics, getSimilarMoments, interviewAnswer, interviewNext,
+  getInterviewReport, getInterviewSession, getInterviewTopics, getSimilarQuestions, interviewAnswer, interviewNext,
 } from '../../services/api'
-import type { InterviewFilters, InterviewReport, InterviewTopic, Source, Stats, Turn } from '../../types'
+import type { InterviewFilters, InterviewReport, InterviewTopic, SimilarQuestion, Stats, Turn } from '../../types'
 import { FeedbackCard, ScoreBars, VerdictPill } from './FeedbackCard'
 import { InterviewFiltersPanel } from './InterviewFiltersPanel'
 
 type Mode = 'coach' | 'exam'
 const STORE = 'upsc-interview'
-const DEFAULT_FILTERS: InterviewFilters = { topics: [], board: '', daf: '', source: 'auto' }
+const DEFAULT_FILTERS: InterviewFilters = { topics: [], board: '', daf: '', question_mode: 'generated' }
 
 function load(): { sessionId: string | null; mode: Mode; filters: InterviewFilters } {
   try {
@@ -196,6 +196,14 @@ function SourceLine({ t, onOpen }: { t: Turn; onOpen: (id: string, query: string
   const s = t.source
   const cls = 'text-xs text-slate-400'
   if (s.type === 'followup') return <span className={cls}>Follow-up {t.depth} of 2</span>
+  if (s.type === 'generated') {
+    const label = `New question · ${s.angle === 'news' ? 'from the news' : s.angle === 'daf' ? 'from your DAF' : 'on the topic'}${s.based_on ? `: ${s.based_on}` : ''}`
+    return s.url ? (
+      <a href={s.url} target="_blank" rel="noreferrer" className={`${cls} inline-flex items-center gap-1 hover:text-indigo-600`}>
+        {label} · {s.publisher} <ExternalLink size={11} />
+      </a>
+    ) : <span className={cls}>{label}</span>
+  }
   if (s.type === 'daf') return <span className={cls}>From your DAF{s.daf_item ? `: ${s.daf_item}` : ''}</span>
   if (s.type === 'current') {
     return (
@@ -212,11 +220,11 @@ function SourceLine({ t, onOpen }: { t: Turn; onOpen: (id: string, query: string
 }
 
 function BoardBubble({ t, onOpen, coach }: { t: Turn; onOpen: (id: string, query: string) => void; coach: boolean }) {
-  const [similar, setSimilar] = useState<Source[] | null>(null)
+  const [similar, setSimilar] = useState<SimilarQuestion[] | null>(null)
   const [open, setOpen] = useState(false)
   const toggle = async () => {
     setOpen(!open)
-    if (!similar) setSimilar(await getSimilarMoments(t.id).catch(() => []))
+    if (!similar) setSimilar(await getSimilarQuestions(t.id).catch(() => []))
   }
   return (
     <div className="flex gap-2.5">
@@ -240,17 +248,18 @@ function BoardBubble({ t, onOpen, coach }: { t: Turn; onOpen: (id: string, query
   )
 }
 
-/** Coach-mode helper: the closest moments in real transcripts, so the candidate sees how others were asked and answered. */
-function SimilarMoments({ items, onOpen }: { items: Source[] | null; onOpen: (id: string, query: string) => void }) {
+/** Coach-mode helper: the real past questions closest to this one, and what the board asked next. */
+function SimilarMoments({ items, onOpen }: { items: SimilarQuestion[] | null; onOpen: (id: string, query: string) => void }) {
   if (!items) return <p className="flex items-center gap-1.5 text-xs text-slate-400"><Loader2 size={12} className="animate-spin" /> Looking through past interviews…</p>
-  if (!items.length) return <p className="text-xs text-slate-400">No similar moments found.</p>
+  if (!items.length) return <p className="text-xs text-slate-400">No similar questions found.</p>
   return (
     <ul className="mt-1 space-y-2 border-l-2 border-indigo-100 pl-3 dark:border-indigo-900">
-      {items.map((s) => (
-        <li key={s.id} className="text-sm">
-          <p className="line-clamp-4 whitespace-pre-line text-slate-700 dark:text-slate-300">{s.excerpts[0]?.text}</p>
-          <button onClick={() => onOpen(s.id, '')} className="text-xs text-slate-400 hover:text-indigo-600">
-            {s.alias || 'Anonymous'} · CSE {s.cse_year} · {s.board} board · open transcript
+      {items.map((q) => (
+        <li key={q.id} className="text-sm">
+          <p className="text-slate-800 dark:text-slate-200">{q.text}</p>
+          {q.follow_up && <p className="text-slate-500 dark:text-slate-400"><span className="text-xs uppercase">then </span>{q.follow_up}</p>}
+          <button onClick={() => onOpen(q.transcript_id, '')} className="text-xs text-slate-400 hover:text-indigo-600">
+            {q.member} · {q.board} board · CSE {q.cse_year} · open transcript
           </button>
         </li>
       ))}

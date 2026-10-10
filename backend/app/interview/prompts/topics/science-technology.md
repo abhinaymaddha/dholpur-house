@@ -1,7 +1,6 @@
 ---
 topic: Science & Technology
-source: mixed
-current_share: 0.6
+news: yes        # include recent current-affairs articles when writing questions
 ---
 ## What the board is testing
 Awareness of recent advances (space, AI, semiconductors, biotech) and their governance and ethical questions.

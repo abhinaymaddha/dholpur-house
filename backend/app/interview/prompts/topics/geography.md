@@ -1,7 +1,6 @@
 ---
 topic: Geography
-source: past
-current_share: 0.0
+news: no
 ---
 ## What the board is testing
 Physical and human geography, especially of the candidate's home state and DAF places, and its link to development.

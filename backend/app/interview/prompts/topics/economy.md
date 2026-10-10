@@ -1,7 +1,6 @@
 ---
 topic: Economy
-source: mixed
-current_share: 0.6
+news: yes        # include recent current-affairs articles when writing questions
 ---
 ## What the board is testing
 Grasp of macro indicators, recent policy moves and trade-offs, and the ability to explain them simply.

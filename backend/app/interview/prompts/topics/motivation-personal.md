@@ -1,7 +1,6 @@
 ---
 topic: Motivation & Personal
-source: past
-current_share: 0.0
+news: no
 ---
 ## What the board is testing
 Self-awareness, honesty and motivation: why civil services, strengths and weaknesses, career choices.

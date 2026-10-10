@@ -76,6 +76,10 @@ CREATE TABLE IF NOT EXISTS questions (
 CREATE INDEX IF NOT EXISTS questions_topics ON questions USING gin (topics);
 CREATE INDEX IF NOT EXISTS questions_tsv ON questions USING gin (tsv);
 CREATE INDEX IF NOT EXISTS questions_transcript ON questions (transcript_id);
+CREATE INDEX IF NOT EXISTS questions_prev ON questions (prev_id);
+-- Meaning-based search over individual questions (Interview: similar questions, follow-up examples).
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS embedding vector({EMBED_DIM});
+CREATE INDEX IF NOT EXISTS questions_embedding ON questions USING hnsw (embedding vector_cosine_ops);
 
 -- Current-affairs articles (app/services/news.py), tagged with interview topics.
 CREATE TABLE IF NOT EXISTS news_items (

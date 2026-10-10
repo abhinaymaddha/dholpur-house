@@ -106,7 +106,8 @@ export interface Source extends TranscriptMeta {
 
 export interface InterviewTopic {
   name: string
-  source: 'past' | 'current' | 'mixed' | 'daf'
+  news: boolean
+  needs_daf: boolean
   past_questions: number
   recent_articles: number
 }
@@ -115,7 +116,18 @@ export interface InterviewFilters {
   topics: string[]
   board: string
   daf: string
-  source: 'auto' | 'past' | 'current'
+  question_mode: 'generated' | 'real'
+}
+
+export interface SimilarQuestion {
+  id: number
+  text: string
+  follow_up: string | null
+  member: string
+  transcript_id: string
+  board: string
+  cse_year: number
+  alias: string | null
 }
 
 export interface Evaluation {
@@ -135,7 +147,9 @@ export interface Turn {
   topic: string
   question: string
   source: {
-    type: 'past' | 'current' | 'daf' | 'followup'
+    type: 'generated' | 'past' | 'current' | 'daf' | 'followup'
+    angle?: 'news' | 'daf' | 'topic'
+    based_on?: string
     transcript_id?: string
     board?: string
     cse_year?: number
