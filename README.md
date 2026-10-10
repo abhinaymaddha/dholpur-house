@@ -2,8 +2,7 @@
 
 Search and ask questions over UPSC Civil Services **Personality Test (interview) transcripts** that past candidates shared publicly on Telegram.
 
-- **Keyword search** across every transcript, with filters for board, exam year and exam (CSE / IFoS), and highlighted matches.
-- **Browse** by exam year → board and by tags (background, optional, home state, interests, topics asked), with a formatted reader.
+- **Browse**: keyword search across every transcript, combined with drill-down by exam year → board and tags (background, optional, home state, interests, topics asked); highlighted matches and a formatted reader.
 - **Ask**: type a question, the app retrieves the most relevant transcripts and an LLM answers from them with inline citations you can open.
 - **Interview**: practise with an AI board. Pick topics; questions come from real past interviews or, for news-heavy topics, from current affairs. Every answer is evaluated critically; a good answer earns up to two follow-ups. Coach mode shows feedback after each answer, Exam mode only in the end report.
 
@@ -28,7 +27,7 @@ Postgres + pgvector
    ▼
 FastAPI  /api/search  /api/transcripts/{id}  /api/stats  /api/ask (server-sent events)
    ▼
-React (Vite + Tailwind)  Search · Ask · transcript reader
+React (Vite + Tailwind)  Browse (search + filters) · Ask · Interview · transcript reader
 ```
 
 **Retrieval for Ask** runs vector similarity and full-text match over chunks, fuses the two rankings (reciprocal rank fusion), groups by transcript, and sends the top transcripts' best sections to the LLM via [OpenRouter](https://openrouter.ai). Embeddings are computed locally with [fastembed](https://github.com/qdrant/fastembed) (`paraphrase-multilingual-MiniLM-L12-v2`, handles Hindi), so only answer generation needs an API key.
@@ -147,7 +146,7 @@ backend/
   tests/
 frontend/
   src/
-    components/        SearchView, AskView, TranscriptPanel, ...
+    components/        BrowseView, AskView, interview/, TranscriptPanel, ...
     services/api.ts    API client (incl. the server-sent events reader)
     lib/ hooks/ types/
 docker-compose.yml       local stack (publishes :8710)

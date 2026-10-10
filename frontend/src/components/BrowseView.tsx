@@ -1,5 +1,6 @@
-import { Loader2, SlidersHorizontal, X } from 'lucide-react'
+import { Loader2, Search, SlidersHorizontal, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useDebounce } from '../hooks/useDebounce'
 import { getFacets, searchTranscripts } from '../services/api'
 import { emptyFilters, type Facets, type Filters, type SearchHit, type SortOrder } from '../types'
 import { FacetSidebar } from './FacetSidebar'
@@ -7,10 +8,12 @@ import { TranscriptCard } from './TranscriptCard'
 
 const PAGE = 24
 
-/** Browse: drill down by year → board and tags, then open transcripts to read. */
+/** Browse: keyword search plus drill-down by year → board and tags, then open transcripts to read. */
 export function BrowseView({ onOpen }: { onOpen: (id: string, query: string) => void }) {
+  const [q, setQ] = useState('')
+  const query = useDebounce(q.trim(), 300)
   const [filters, setFilters] = useState<Filters>(emptyFilters)
-  const [sort, setSort] = useState<SortOrder>('recent')
+  const [sort, setSort] = useState<SortOrder>('relevance')
   const [facets, setFacets] = useState<Facets | null>(null)
   const [hits, setHits] = useState<SearchHit[]>([])
   const [total, setTotal] = useState(0)
@@ -20,16 +23,19 @@ export function BrowseView({ onOpen }: { onOpen: (id: string, query: string) => 
   useEffect(() => {
     let stale = false
     setLoading(true)
-    Promise.all([getFacets(filters), searchTranscripts('', filters, 0, PAGE, sort)])
+    Promise.all([getFacets(filters, query), searchTranscripts(query, filters, 0, PAGE, sort)])
       .then(([f, r]) => { if (!stale) { setFacets(f); setHits(r.hits); setTotal(r.total) } })
       .finally(() => { if (!stale) setLoading(false) })
     return () => { stale = true }
-  }, [filters, sort])
+  }, [query, filters, sort])
+
+  // "Newest first" is a separate option only while searching; without keywords relevance already means newest.
+  useEffect(() => { if (!query && sort === 'recent') setSort('relevance') }, [query, sort])
 
   const loadMore = async () => {
     setLoading(true)
     try {
-      const r = await searchTranscripts('', filters, hits.length, PAGE, sort)
+      const r = await searchTranscripts(query, filters, hits.length, PAGE, sort)
       setHits((h) => [...h, ...r.hits])
     } finally {
       setLoading(false)
@@ -45,18 +51,36 @@ export function BrowseView({ onOpen }: { onOpen: (id: string, query: string) => 
       </aside>
 
       <section className="min-w-0 space-y-3">
+        <div className="relative">
+          <Search className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-slate-400" size={18} />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder='Search transcripts, e.g. "cooperative federalism", Kota coaching, chess -cricket'
+            className="h-11 w-full rounded-lg border border-slate-300 bg-white pr-10 pl-10 text-[15px] shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-900"
+          />
+          {q && (
+            <button aria-label="Clear search" onClick={() => setQ('')} className="absolute top-1/2 right-3 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+              <X size={16} />
+            </button>
+          )}
+        </div>
+
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <button onClick={() => setShowFilters(!showFilters)}
               className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-sm md:hidden dark:border-slate-700">
               <SlidersHorizontal size={14} /> Filters{active.length ? ` (${active.length})` : ''}
             </button>
-            <span className="text-sm text-slate-500">{total.toLocaleString()} transcript{total === 1 ? '' : 's'}</span>
+            <span className="text-sm text-slate-500">
+              {total.toLocaleString()} {query ? 'matching ' : ''}transcript{total === 1 ? '' : 's'}
+            </span>
             {loading && <Loader2 size={15} className="animate-spin text-slate-400" />}
           </div>
           <select aria-label="Sort" value={sort} onChange={(e) => setSort(e.target.value as SortOrder)}
             className="h-8 rounded-md border border-slate-300 bg-white px-2 text-sm dark:border-slate-700 dark:bg-slate-900">
-            <option value="recent">Newest first</option>
+            <option value="relevance">{query ? 'Best match' : 'Newest first'}</option>
+            {query && <option value="recent">Newest first</option>}
             <option value="questions">Most questions</option>
             <option value="marks">Highest PT marks</option>
           </select>
@@ -76,10 +100,14 @@ export function BrowseView({ onOpen }: { onOpen: (id: string, query: string) => 
 
         <ul className="grid gap-3 lg:grid-cols-2">
           {hits.map((h) => (
-            <li key={h.id}><TranscriptCard t={h} onOpen={() => onOpen(h.id, '')} /></li>
+            <li key={h.id}>
+              <TranscriptCard t={h} snippet={query ? h.snippet : undefined} onOpen={() => onOpen(h.id, query)} />
+            </li>
           ))}
         </ul>
-        {!loading && hits.length === 0 && <p className="py-10 text-center text-slate-500">No transcripts match these filters.</p>}
+        {!loading && hits.length === 0 && (
+          <p className="py-10 text-center text-slate-500">No transcripts match. Try fewer words or remove a filter.</p>
+        )}
         {hits.length < total && (
           <div className="text-center">
             <button onClick={loadMore} disabled={loading}

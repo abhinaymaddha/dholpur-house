@@ -27,21 +27,31 @@ _CONDITIONS = {
 }
 
 
-def filter_sql(f: TranscriptFilters, skip: tuple[str, ...] = ()) -> tuple[str, dict]:
+def filter_sql(f: TranscriptFilters, skip: tuple[str, ...] = (), q: str = "") -> tuple[str, dict]:
+    """WHERE clause for the filters, plus a keyword match on q when given."""
     clauses, params = [], {}
     for field, cond in _CONDITIONS.items():
         value = getattr(f, field)
         if value and field not in skip:
             clauses.append(cond)
             params[field] = value
+    if q.strip():
+        clauses.append("t.tsv @@ websearch_to_tsquery('english', %(q)s)")
+        params["q"] = q.strip()
     return (" AND ".join(clauses) or "TRUE"), params
 
 
-def search(q: str, f: TranscriptFilters, limit: int, offset: int, sort: str = "recent") -> tuple[int, list[dict]]:
+def search(q: str, f: TranscriptFilters, limit: int, offset: int, sort: str = "relevance") -> tuple[int, list[dict]]:
+    """Filtered listing; with keywords, matching transcripts with highlighted snippets.
+
+    sort: relevance (keyword rank; newest first without keywords), recent, questions, marks.
+    """
     where, params = filter_sql(f)
     params |= {"q": q.strip(), "limit": limit, "offset": offset, "opts": HEADLINE_OPTS}
     order = {"recent": "posted_at DESC", "questions": "question_count DESC, posted_at DESC",
              "marks": "pt_marks DESC NULLS LAST, posted_at DESC"}.get(sort, "posted_at DESC")
+    if params["q"] and sort == "relevance":
+        order = "rank DESC, posted_at DESC"
     if params["q"]:
         sql = f"""
             WITH query AS (SELECT websearch_to_tsquery('english', %(q)s) AS tsq)
@@ -51,7 +61,7 @@ def search(q: str, f: TranscriptFilters, limit: int, offset: int, sort: str = "r
                    count(*) OVER () AS total
             FROM transcripts t, query
             WHERE tsv @@ query.tsq AND {where}
-            ORDER BY rank DESC, posted_at DESC
+            ORDER BY {order}
             LIMIT %(limit)s OFFSET %(offset)s"""
     else:
         sql = f"""
@@ -66,25 +76,28 @@ def search(q: str, f: TranscriptFilters, limit: int, offset: int, sort: str = "r
     return total, rows
 
 
-def facets(f: TranscriptFilters) -> dict:
-    """Counts for every filter group. Each group ignores its own selection, so siblings stay visible."""
+def facets(f: TranscriptFilters, q: str = "") -> dict:
+    """Counts for every filter group, within the keyword matches if q is given.
+
+    Each group ignores its own selection, so siblings stay visible.
+    """
 
     def counts(conn, expr: str, skip: tuple[str, ...], array: bool = False) -> list[dict]:
-        where, params = filter_sql(f, skip)
+        where, params = filter_sql(f, skip, q)
         value = f"unnest({expr})" if array else expr
         return conn.execute(
             f"SELECT v::text AS value, count(*) AS count FROM (SELECT {value} AS v FROM transcripts t WHERE {where}) x"
             " WHERE v IS NOT NULL GROUP BY v ORDER BY count DESC, value", params).fetchall()
 
     with pool.connection() as conn:
-        where, params = filter_sql(f, skip=("cse_year", "board"))
+        where, params = filter_sql(f, ("cse_year", "board"), q)
         tree_rows = conn.execute(
             f"SELECT cse_year, board, count(*) AS count FROM transcripts t WHERE {where}"
             " GROUP BY cse_year, board ORDER BY cse_year DESC, count DESC", params).fetchall()
-        where, params = filter_sql(f, skip=("has_marks",))
+        where, params = filter_sql(f, ("has_marks",), q)
         with_marks = conn.execute(
             f"SELECT count(*) AS n FROM transcripts t WHERE {where} AND t.pt_marks IS NOT NULL", params).fetchone()["n"]
-        where, params = filter_sql(f)
+        where, params = filter_sql(f, q=q)
         total = conn.execute(f"SELECT count(*) AS n FROM transcripts t WHERE {where}", params).fetchone()["n"]
         result = {
             "total": total,

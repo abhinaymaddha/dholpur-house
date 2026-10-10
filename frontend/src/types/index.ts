@@ -95,7 +95,7 @@ export interface Facets {
   has_marks: number
 }
 
-export type SortOrder = 'recent' | 'questions' | 'marks'
+export type SortOrder = 'relevance' | 'recent' | 'questions' | 'marks'
 
 export interface Source extends TranscriptMeta {
   score: number

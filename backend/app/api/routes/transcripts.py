@@ -15,19 +15,19 @@ router = APIRouter(prefix="/api", tags=["transcripts"])
 def search_transcripts(
     q: str = Query("", max_length=300, description="Keywords; supports \"quoted phrases\", OR, and -exclude"),
     filters: TranscriptFilters = Depends(filters_query),
-    sort: Literal["recent", "questions", "marks"] = "recent",
+    sort: Literal["relevance", "recent", "questions", "marks"] = "relevance",
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
 ):
-    """Keyword search, or a filtered listing when q is empty (the Browse view)."""
+    """Browse: filtered listing, narrowed by keywords when q is given."""
     total, rows = search(q, filters, limit, offset, sort)
     return {"total": total, "hits": rows}
 
 
 @router.get("/facets", response_model=Facets)
-def transcript_facets(filters: TranscriptFilters = Depends(filters_query)):
-    """Counts per tag for the Browse sidebar, given the current filters."""
-    return facets(filters)
+def transcript_facets(q: str = Query("", max_length=300), filters: TranscriptFilters = Depends(filters_query)):
+    """Counts per tag for the Browse sidebar, given the current keywords and filters."""
+    return facets(filters, q)
 
 
 @router.get("/transcripts/{transcript_id}", response_model=Transcript)
