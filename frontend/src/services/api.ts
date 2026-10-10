@@ -54,11 +54,11 @@ export interface AskHandlers {
 }
 
 /** POST /api/ask and consume its server-sent events (fetch, since EventSource can't POST). */
-export async function ask(question: string, filters: Filters, handlers: AskHandlers, signal: AbortSignal) {
+export async function ask(question: string, filters: Filters, q: string, handlers: AskHandlers, signal: AbortSignal) {
   const res = await fetch(`${baseURL}/api/ask`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ question, filters: filterBody(filters) }),
+    body: JSON.stringify({ question, filters: filterBody(filters), q }),
     signal,
   })
   if (!res.ok || !res.body) {
@@ -125,4 +125,8 @@ export async function getInterviewSession(sessionId: string): Promise<Turn[]> {
 
 export async function getInterviewReport(sessionId: string): Promise<InterviewReport> {
   return (await http.get<InterviewReport>(`/api/interview/sessions/${sessionId}/report`)).data
+}
+
+export async function getSimilarMoments(turnId: number): Promise<Source[]> {
+  return (await http.get<Source[]>(`/api/interview/turns/${turnId}/similar`)).data
 }

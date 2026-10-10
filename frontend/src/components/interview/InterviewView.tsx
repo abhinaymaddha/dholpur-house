@@ -1,9 +1,9 @@
-import { ClipboardList, ExternalLink, Loader2, Play, RotateCcw, Send, SkipForward, SlidersHorizontal } from 'lucide-react'
+import { ClipboardList, ExternalLink, History, Loader2, Play, RotateCcw, Send, SkipForward, SlidersHorizontal } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import {
-  getInterviewReport, getInterviewSession, getInterviewTopics, interviewAnswer, interviewNext,
+  getInterviewReport, getInterviewSession, getInterviewTopics, getSimilarMoments, interviewAnswer, interviewNext,
 } from '../../services/api'
-import type { InterviewFilters, InterviewReport, InterviewTopic, Stats, Turn } from '../../types'
+import type { InterviewFilters, InterviewReport, InterviewTopic, Source, Stats, Turn } from '../../types'
 import { FeedbackCard, ScoreBars, VerdictPill } from './FeedbackCard'
 import { InterviewFiltersPanel } from './InterviewFiltersPanel'
 
@@ -119,7 +119,7 @@ export function InterviewView({ stats, onOpen }: { stats: Stats | null; onOpen: 
             return (
               <div key={t.id} className="space-y-3">
                 {t.depth === 0 && t.main_index > 1 && <hr className="border-slate-100 dark:border-slate-800" />}
-                <BoardBubble t={t} onOpen={onOpen} />
+                <BoardBubble t={t} onOpen={onOpen} coach={mode === 'coach'} />
                 {ev?.skipped && <p className="pl-10 text-xs text-slate-400">Skipped</p>}
                 {t.answer && <CandidateBubble text={t.answer} />}
                 {t.answer && ev && !ev.skipped && (
@@ -211,7 +211,13 @@ function SourceLine({ t, onOpen }: { t: Turn; onOpen: (id: string, query: string
   )
 }
 
-function BoardBubble({ t, onOpen }: { t: Turn; onOpen: (id: string, query: string) => void }) {
+function BoardBubble({ t, onOpen, coach }: { t: Turn; onOpen: (id: string, query: string) => void; coach: boolean }) {
+  const [similar, setSimilar] = useState<Source[] | null>(null)
+  const [open, setOpen] = useState(false)
+  const toggle = async () => {
+    setOpen(!open)
+    if (!similar) setSimilar(await getSimilarMoments(t.id).catch(() => []))
+  }
   return (
     <div className="flex gap-2.5">
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
@@ -220,9 +226,35 @@ function BoardBubble({ t, onOpen }: { t: Turn; onOpen: (id: string, query: strin
       <div className="min-w-0 space-y-1">
         <div className="text-xs font-medium text-indigo-700 dark:text-indigo-300">{t.topic}</div>
         <p className="text-[15px] leading-relaxed text-slate-900 dark:text-slate-100">{t.question}</p>
-        <SourceLine t={t} onOpen={onOpen} />
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <SourceLine t={t} onOpen={onOpen} />
+          {coach && (
+            <button onClick={toggle} className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:underline dark:text-indigo-400">
+              <History size={12} /> {open ? 'Hide' : 'How have boards asked this?'}
+            </button>
+          )}
+        </div>
+        {coach && open && <SimilarMoments items={similar} onOpen={onOpen} />}
       </div>
     </div>
+  )
+}
+
+/** Coach-mode helper: the closest moments in real transcripts, so the candidate sees how others were asked and answered. */
+function SimilarMoments({ items, onOpen }: { items: Source[] | null; onOpen: (id: string, query: string) => void }) {
+  if (!items) return <p className="flex items-center gap-1.5 text-xs text-slate-400"><Loader2 size={12} className="animate-spin" /> Looking through past interviews…</p>
+  if (!items.length) return <p className="text-xs text-slate-400">No similar moments found.</p>
+  return (
+    <ul className="mt-1 space-y-2 border-l-2 border-indigo-100 pl-3 dark:border-indigo-900">
+      {items.map((s) => (
+        <li key={s.id} className="text-sm">
+          <p className="line-clamp-4 whitespace-pre-line text-slate-700 dark:text-slate-300">{s.excerpts[0]?.text}</p>
+          <button onClick={() => onOpen(s.id, '')} className="text-xs text-slate-400 hover:text-indigo-600">
+            {s.alias || 'Anonymous'} · CSE {s.cse_year} · {s.board} board · open transcript
+          </button>
+        </li>
+      ))}
+    </ul>
   )
 }
 

@@ -1,5 +1,5 @@
 import { Check, ChevronDown, ChevronRight } from 'lucide-react'
-import { useState } from 'react'
+import { useState, type Dispatch, type SetStateAction } from 'react'
 import type { FacetCount, Facets, Filters } from '../types'
 
 type SingleKey = 'background' | 'optional_tag' | 'state' | 'interest'
@@ -15,11 +15,13 @@ const GROUPS: { key: SingleKey; facet: keyof Facets; label: string }[] = [
 export function FacetSidebar({ facets, filters, onChange }: {
   facets: Facets | null
   filters: Filters
-  onChange: (f: Filters) => void
+  onChange: Dispatch<SetStateAction<Filters>>
 }) {
-  const set = (patch: Partial<Filters>) => onChange({ ...filters, ...patch })
-  const toggleTopic = (t: string) =>
-    set({ topics: filters.topics.includes(t) ? filters.topics.filter((x) => x !== t) : [...filters.topics, t] })
+  // Functional updates, so two quick changes can't overwrite each other.
+  const set = (patch: Partial<Filters>) => onChange((f) => ({ ...f, ...patch }))
+  const toggleTopic = (t: string) => onChange((f) => ({
+    ...f, topics: f.topics.includes(t) ? f.topics.filter((x) => x !== t) : [...f.topics, t],
+  }))
 
   return (
     <nav className="space-y-5 text-sm">

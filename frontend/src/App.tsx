@@ -1,27 +1,30 @@
-import { FolderTree, GraduationCap, MessageSquareText } from 'lucide-react'
+import { FolderTree, GraduationCap } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
-import { AskView } from './components/AskView'
 import { BrowseView } from './components/BrowseView'
 import { InterviewView } from './components/interview/InterviewView'
 import { TranscriptPanel } from './components/TranscriptPanel'
 import { getStats } from './services/api'
 import type { Stats } from './types'
 
-type Tab = 'browse' | 'ask' | 'interview'
+type Tab = 'browse' | 'interview'
 
 const tabFromHash = (): Tab => {
   const h = window.location.hash.slice(1)
-  return h === 'ask' || h === 'interview' ? h : 'browse'   // old #search links land on Browse
+  return h === 'interview' ? h : 'browse'   // old #search / #ask links land on Browse
 }
 
 export default function App() {
   const [tab, setTab] = useState<Tab>(tabFromHash)
   const [stats, setStats] = useState<Stats | null>(null)
   const [open, setOpen] = useState<{ id: string; query: string } | null>(null)
+  const [askOpen, setAskOpen] = useState(() => window.location.hash === '#ask')
 
   useEffect(() => {
     getStats().then(setStats).catch(() => setStats(null))
-    const onHash = () => { setTab(tabFromHash()); setOpen(null) }
+    const onHash = () => {
+      setTab(tabFromHash()); setOpen(null)
+      if (window.location.hash === '#ask') setAskOpen(true)
+    }
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
@@ -41,7 +44,6 @@ export default function App() {
           </div>
           <nav className="flex rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
             <TabButton active={tab === 'browse'} href="#browse" icon={<FolderTree size={15} />} label="Browse" />
-            <TabButton active={tab === 'ask'} href="#ask" icon={<MessageSquareText size={15} />} label="Ask" />
             <TabButton active={tab === 'interview'} href="#interview" icon={<GraduationCap size={15} />} label="Interview" />
           </nav>
         </div>
@@ -53,8 +55,7 @@ export default function App() {
             Transcripts are still being loaded (this takes a few minutes on first start). Refresh shortly.
           </p>
         )}
-        {tab === 'browse' && <BrowseView onOpen={openTranscript} />}
-        {tab === 'ask' && <div className="mx-auto max-w-4xl"><AskView stats={stats} onOpen={openTranscript} /></div>}
+        {tab === 'browse' && <BrowseView stats={stats} askOpen={askOpen} onAskOpen={setAskOpen} onOpen={openTranscript} />}
         {tab === 'interview' && <InterviewView stats={stats} onOpen={openTranscript} />}
       </main>
 

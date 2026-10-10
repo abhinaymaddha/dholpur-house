@@ -1,15 +1,21 @@
-import { Loader2, Search, SlidersHorizontal, X } from 'lucide-react'
+import { Loader2, Search, SlidersHorizontal, Sparkles, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useDebounce } from '../hooks/useDebounce'
 import { getFacets, searchTranscripts } from '../services/api'
-import { emptyFilters, type Facets, type Filters, type SearchHit, type SortOrder } from '../types'
+import { emptyFilters, type Facets, type Filters, type SearchHit, type SortOrder, type Stats } from '../types'
+import { AskPanel } from './AskPanel'
 import { FacetSidebar } from './FacetSidebar'
 import { TranscriptCard } from './TranscriptCard'
 
 const PAGE = 24
 
 /** Browse: keyword search plus drill-down by year → board and tags, then open transcripts to read. */
-export function BrowseView({ onOpen }: { onOpen: (id: string, query: string) => void }) {
+export function BrowseView({ stats, askOpen, onAskOpen, onOpen }: {
+  stats: Stats | null
+  askOpen: boolean
+  onAskOpen: (open: boolean) => void
+  onOpen: (id: string, query: string) => void
+}) {
   const [q, setQ] = useState('')
   const query = useDebounce(q.trim(), 300)
   const [filters, setFilters] = useState<Filters>(emptyFilters)
@@ -51,7 +57,8 @@ export function BrowseView({ onOpen }: { onOpen: (id: string, query: string) => 
       </aside>
 
       <section className="min-w-0 space-y-3">
-        <div className="relative">
+        <div className="flex gap-2">
+        <div className="relative flex-1">
           <Search className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-slate-400" size={18} />
           <input
             value={q}
@@ -65,6 +72,19 @@ export function BrowseView({ onOpen }: { onOpen: (id: string, query: string) => 
             </button>
           )}
         </div>
+        <button onClick={() => onAskOpen(!askOpen)} aria-pressed={askOpen}
+          className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition ${askOpen
+            ? 'border-indigo-600 bg-indigo-600 text-white'
+            : 'border-indigo-200 bg-white text-indigo-700 hover:border-indigo-400 dark:border-indigo-900 dark:bg-slate-900 dark:text-indigo-300'}`}>
+          <Sparkles size={15} /> Ask AI
+        </button>
+        </div>
+
+        {askOpen && (
+          <AskPanel filters={filters} q={query} stats={stats} onOpen={onOpen} onClose={() => onAskOpen(false)}
+            scope={total === (stats?.transcripts ?? -1) ? `all ${total.toLocaleString()} transcripts`
+              : `the ${total.toLocaleString()} transcript${total === 1 ? '' : 's'} matching your search and filters`} />
+        )}
 
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">

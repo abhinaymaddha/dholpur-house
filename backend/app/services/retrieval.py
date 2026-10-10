@@ -13,7 +13,7 @@ from collections import defaultdict
 from app.database import pool
 from app.schemas.filters import TranscriptFilters
 from app.services.embeddings import embed_one
-from app.services.search import filter_sql
+from app.services.search import META_COLS, filter_sql
 
 CANDIDATES = 40       # chunks pulled from each ranker
 RRF_K = 60
@@ -34,8 +34,13 @@ def _transcript_score(chunk_scores: list[float]) -> float:
     return best + 0.25 * (sum(chunk_scores) - best)
 
 
-def retrieve(question: str, filters: TranscriptFilters, top_k: int = 6, chunks_per_transcript: int = 3) -> list[dict]:
-    where, params = filter_sql(filters)
+def retrieve(question: str, filters: TranscriptFilters, top_k: int = 6, chunks_per_transcript: int = 3,
+             q: str = "", exclude: tuple[str, ...] = ()) -> list[dict]:
+    """Top transcripts for a question, within the filters (and keyword matches for q), best sections first."""
+    where, params = filter_sql(filters, q=q)
+    if exclude:
+        where += " AND NOT (t.id = ANY(%(exclude)s))"
+        params["exclude"] = list(exclude)
     params |= {"vec": embed_one(question), "kq": _keyword_query(question), "n": CANDIDATES}
     with pool.connection() as conn:
         conn.execute("SET hnsw.ef_search = 200")   # filters are applied after the ANN scan; widen it
@@ -69,8 +74,7 @@ def retrieve(question: str, filters: TranscriptFilters, top_k: int = 6, chunks_p
         if not top:
             return []
         meta = {r["id"]: r for r in conn.execute(
-            "SELECT id, board, alias, interview_date, daf, optional_subject, pt_marks, exam, cse_year, posted_at,"
-            " telegram_url FROM transcripts WHERE id = ANY(%s)", ([tid for tid, _ in top],)).fetchall()}
+            f"SELECT {META_COLS} FROM transcripts WHERE id = ANY(%s)", ([tid for tid, _ in top],)).fetchall()}
 
     results = []
     for tid, scored in top:
