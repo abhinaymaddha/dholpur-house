@@ -32,14 +32,14 @@ export async function getStats(): Promise<Stats> {
 }
 
 export async function searchTranscripts(
-  q: string, filters: Filters, offset = 0, limit = 20, sort: SortOrder = 'recent',
+  q: string, filters: Filters, offset = 0, limit = 20, sort: SortOrder = 'relevance',
 ): Promise<SearchResponse> {
   const params = { q, limit, offset, sort, ...filterParams(filters) }
   return (await http.get<SearchResponse>('/api/search', { params })).data
 }
 
-export async function getFacets(filters: Filters): Promise<Facets> {
-  return (await http.get<Facets>('/api/facets', { params: filterParams(filters) })).data
+export async function getFacets(filters: Filters, q = ''): Promise<Facets> {
+  return (await http.get<Facets>('/api/facets', { params: { q: q || undefined, ...filterParams(filters) } })).data
 }
 
 export async function getTranscript(id: string): Promise<Transcript> {

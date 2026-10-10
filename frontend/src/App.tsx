@@ -1,18 +1,17 @@
-import { FolderTree, GraduationCap, MessageSquareText, Search } from 'lucide-react'
+import { FolderTree, GraduationCap, MessageSquareText } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { AskView } from './components/AskView'
 import { BrowseView } from './components/BrowseView'
 import { InterviewView } from './components/interview/InterviewView'
-import { SearchView } from './components/SearchView'
 import { TranscriptPanel } from './components/TranscriptPanel'
 import { getStats } from './services/api'
 import type { Stats } from './types'
 
-type Tab = 'browse' | 'search' | 'ask' | 'interview'
+type Tab = 'browse' | 'ask' | 'interview'
 
 const tabFromHash = (): Tab => {
   const h = window.location.hash.slice(1)
-  return h === 'search' || h === 'ask' || h === 'interview' ? h : 'browse'
+  return h === 'ask' || h === 'interview' ? h : 'browse'   // old #search links land on Browse
 }
 
 export default function App() {
@@ -42,7 +41,6 @@ export default function App() {
           </div>
           <nav className="flex rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
             <TabButton active={tab === 'browse'} href="#browse" icon={<FolderTree size={15} />} label="Browse" />
-            <TabButton active={tab === 'search'} href="#search" icon={<Search size={15} />} label="Search" />
             <TabButton active={tab === 'ask'} href="#ask" icon={<MessageSquareText size={15} />} label="Ask" />
             <TabButton active={tab === 'interview'} href="#interview" icon={<GraduationCap size={15} />} label="Interview" />
           </nav>
@@ -56,7 +54,6 @@ export default function App() {
           </p>
         )}
         {tab === 'browse' && <BrowseView onOpen={openTranscript} />}
-        {tab === 'search' && <div className="mx-auto max-w-4xl"><SearchView stats={stats} onOpen={openTranscript} /></div>}
         {tab === 'ask' && <div className="mx-auto max-w-4xl"><AskView stats={stats} onOpen={openTranscript} /></div>}
         {tab === 'interview' && <InterviewView stats={stats} onOpen={openTranscript} />}
       </main>
