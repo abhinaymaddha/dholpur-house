@@ -1,5 +1,5 @@
 """
-UPSC Interview Transcripts - API
+Dholpur House - API
 
 Keyword search and RAG question answering over Personality Test transcripts.
 """

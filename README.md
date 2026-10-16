@@ -1,6 +1,6 @@
-# UPSC Interview Transcripts
+# Dholpur House
 
-Search and ask questions over UPSC Civil Services **Personality Test (interview) transcripts** that past candidates shared publicly on Telegram.
+Prepare for the UPSC Civil Services **Personality Test** (the interview, held at Dholpur House, New Delhi) with the real transcripts past candidates shared on Telegram: search them, ask questions about them, and practise with an AI interview board that asks, listens and critiques.
 
 - **Browse**: keyword search across every transcript, combined with drill-down by exam year → board and tags (background, optional, home state, interests, topics asked); highlighted matches and a formatted reader.
 - **Ask AI** (in Browse): ask a question and an LLM answers from the transcripts matching your current search and filters, with inline citations you can open.
@@ -14,7 +14,7 @@ All interview transcripts come from the public Telegram channel
 **[Interview Transcripts (CSPT-2026)](https://t.me/csetranscripts)** (@csetranscripts). Full credit goes to the
 channel's admins and to the candidates who shared their experiences. This project only makes them searchable and
 claims no ownership. If you are the channel admin or an author and want any of it removed, please
-[open an issue](https://github.com/abhinaymaddha/upsc-prep/issues) or contact @abhinaymaddha on GitHub and it will be
+[open an issue](https://github.com/abhinaymaddha/dholpur-house/issues) or contact @abhinaymaddha on GitHub and it will be
 removed. Details in [DATA.md](DATA.md).
 
 ## How it works
@@ -198,7 +198,7 @@ docker-compose.prod.yml  Dokploy stack (Traefik via dokploy-network)
 ## License
 
 Code, prompts and docs: [CC BY-NC 4.0](LICENSE). Free to use, share and adapt for non-commercial purposes, with
-credit. **Commercial use needs permission:** [open an issue](https://github.com/abhinaymaddha/upsc-prep/issues) or
+credit. **Commercial use needs permission:** [open an issue](https://github.com/abhinaymaddha/dholpur-house/issues) or
 contact @abhinaymaddha on GitHub.
 
 The transcripts are not covered by this license; they belong to their authors (see [Data credit](#data-credit) and

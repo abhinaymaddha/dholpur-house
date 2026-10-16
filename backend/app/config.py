@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     )
 
     # Application
-    app_name: str = Field(default="UPSC Interview Transcripts", alias="APP_NAME")
+    app_name: str = Field(default="Dholpur House", alias="APP_NAME")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     cors_origins: str = Field(default="http://localhost:5173", alias="CORS_ORIGINS")
 

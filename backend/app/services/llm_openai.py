@@ -47,7 +47,7 @@ def build_body(m: ModelConfig, messages: list[dict], schema: dict | None = None,
 def _post(m: ModelConfig, body: dict, stream: bool = False) -> requests.Response:
     headers = {"Authorization": f"Bearer {m.provider.key()}"}
     if m.provider.kind == "openrouter":
-        headers["X-Title"] = "UPSC Interview Transcripts"
+        headers["X-Title"] = "Dholpur House"
     url = m.provider.base_url.rstrip("/") + "/chat/completions"
     try:
         r = requests.post(url, json=body, headers=headers, stream=stream, timeout=(10, 300))

@@ -37,9 +37,9 @@ export default function App() {
       <header className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4">
           <div>
-            <h1 className="text-lg font-semibold tracking-tight">UPSC Interview Transcripts</h1>
+            <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight"><img src="/favicon.svg" alt="" className="h-6 w-6" />Dholpur House</h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              {stats ? `${stats.transcripts.toLocaleString()} Personality Test transcripts shared by past candidates` : 'Personality Test transcripts shared by past candidates'}
+              {stats ? `UPSC interview prep · ${stats.transcripts.toLocaleString()} real Personality Test transcripts` : 'UPSC interview prep from real Personality Test transcripts'}
             </p>
           </div>
           <nav className="flex rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
@@ -66,7 +66,7 @@ export default function App() {
             Interview Transcripts (CSPT-2026)
           </a>
           . Full credit to its admins and to the candidates who shared their experiences. Want something removed?{' '}
-          <a href="https://github.com/abhinaymaddha/upsc-prep/issues" target="_blank" rel="noreferrer" className="underline hover:text-indigo-600">
+          <a href="https://github.com/abhinaymaddha/dholpur-house/issues" target="_blank" rel="noreferrer" className="underline hover:text-indigo-600">
             Get in touch
           </a>
           .
