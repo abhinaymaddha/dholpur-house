@@ -7,6 +7,8 @@ Prepare for the UPSC Civil Services **Personality Test** (the interview, held at
 - **Interview**: practise with an AI board. Pick topics and add your DAF; the board writes new questions from your DAF, recent news and the most similar real questions from past interviews (or, with a toggle, asks real past questions only). Every answer is evaluated critically; a good answer earns up to two follow-ups. Coach mode shows feedback after each answer (and a "How have boards asked this?" helper with similar moments from real transcripts); Exam mode only in the end report.
 
 > Transcripts are candidates' own recollections. Answers are generated from them and can be wrong, so always check the cited sources.
+>
+> Dholpur House is an independent, non-commercial project, not affiliated with the UPSC, the Government of India, the source Telegram channel or Telegram. See the [Disclaimer](DISCLAIMER.md). Want to help? See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Data credit
 

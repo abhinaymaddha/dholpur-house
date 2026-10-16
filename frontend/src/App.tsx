@@ -87,7 +87,7 @@ export default function App() {
           <div className="flex flex-col items-center gap-2 text-center">
             <div className="tiranga-row h-1 w-24 rounded-full" aria-hidden="true" />
             <p className="font-display text-sm tracking-wide text-stone-700 dark:text-stone-300">
-              In respect for every honest public servant who upholds the nation&rsquo;s integrity and serves it with pride.
+              In honour of every honest public servant who upholds the nation&rsquo;s integrity and serves it with pride.
             </p>
           </div>
           <p>
@@ -101,7 +101,15 @@ export default function App() {
             </a>
             .
           </p>
-          <p>Transcripts are candidates' own recollections. AI answers and feedback may be wrong — check the sources. Not affiliated with the UPSC.</p>
+          <p>Transcripts are candidates' own recollections. AI answers and feedback may be wrong — check the sources.</p>
+          <p>
+            Dholpur House is an independent, non-commercial project. It is not affiliated with, or endorsed by, the Union
+            Public Service Commission, the Government of India, the Interview Transcripts (CSPT-2026) channel or Telegram.{' '}
+            <a href="https://github.com/abhinaymaddha/dholpur-house/blob/main/DISCLAIMER.md" target="_blank" rel="noreferrer" className="underline hover:text-sandstone-600">
+              Read the full disclaimer
+            </a>
+            .
+          </p>
         </div>
       </footer>
 

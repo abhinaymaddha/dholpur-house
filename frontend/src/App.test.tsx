@@ -24,7 +24,8 @@ it('switches tabs by hash, opens a transcript, toggles the theme and shows the d
   render(<App />)
   expect(screen.getByRole('heading', { name: 'Dholpur House' })).toBeInTheDocument()
   expect(screen.getByText('UPSC interview prep from real Personality Test transcripts')).toBeInTheDocument()
-  expect(screen.getByText(/In respect for every honest public servant/)).toBeInTheDocument()
+  expect(screen.getByText(/In honour of every honest public servant/)).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Read the full disclaimer' })).toHaveAttribute('href', expect.stringContaining('DISCLAIMER.md'))
 
   await userEvent.click(await screen.findByText('Static'))
   expect(await screen.findByRole('button', { name: 'Original text' })).toBeInTheDocument()
