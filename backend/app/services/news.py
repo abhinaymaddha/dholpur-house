@@ -54,7 +54,7 @@ def refresh(force: bool = False) -> dict:
             if not force and name in last and now - last[name] < stale_after:
                 continue
             try:
-                r = requests.get(src["url"], headers={"User-Agent": "Mozilla/5.0 (upsc-prep)"}, timeout=15)
+                r = requests.get(src["url"], headers={"User-Agent": "Mozilla/5.0 (dholpur-house)"}, timeout=15)
                 r.raise_for_status()
                 feed = feedparser.parse(r.content)
             except requests.RequestException as e:

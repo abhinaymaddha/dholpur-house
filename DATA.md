@@ -22,7 +22,7 @@ no ownership of it.
 
 If you are the channel admin or the author of a transcript and you'd like it removed (or the whole
 dataset taken out of this repository), please open an issue at
-https://github.com/abhinaymaddha/upsc-prep/issues or contact @abhinaymaddha on GitHub, and it will
+https://github.com/abhinaymaddha/dholpur-house/issues or contact @abhinaymaddha on GitHub, and it will
 be removed promptly. No questions asked.
 
 ## Using it responsibly
