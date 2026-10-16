@@ -1,0 +1,14 @@
+[providers.fake]
+kind = "fake"
+
+[models.model_1]
+provider = "fake"
+id = "fake-ask"
+
+[models.model_2]
+provider = "fake"
+id = "fake-writer"
+
+[models.model_3]
+provider = "fake"
+id = "fake-evaluator"

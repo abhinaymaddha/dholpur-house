@@ -18,7 +18,7 @@ import re
 from datetime import date
 
 from app.interview import prompts
-from app.services.llm import complete_json
+from app import llm
 
 MODEL = "model_3"
 SCORE_KEYS = ["relevance", "accuracy", "depth", "balance", "practicality", "clarity", "tone"]
@@ -158,7 +158,7 @@ def evaluate(topic_name: str, context: str, reference: str, exchange: str, answe
         exchange=exchange,
         followup_examples="\n".join(f"- Q: {q}\n  Follow-up: {f}" for q, f in followup_pairs) or "- (none found)",
         followup_instruction=instruction)
-    evaluation = complete_json(MODEL, [{"role": "user", "content": prompt}], SCHEMA, "evaluation")
+    evaluation = llm.complete_json(MODEL, [{"role": "user", "content": prompt}], SCHEMA, "evaluation")
     follow_up = evaluation.pop("follow_up_question", None)
     evaluation = score(guard(evaluation, answer, allowed=f"{exchange}\n{reference}"))
     return evaluation, (follow_up.strip() if follow_up else None)

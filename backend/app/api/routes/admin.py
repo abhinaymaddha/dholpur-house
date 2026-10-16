@@ -15,7 +15,10 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile, status
 
 from app.config import settings
-from app.services import ingest_job, news
+from app.errors import IngestRunning
+from app.dependencies import get_news
+from app.services import ingest_job
+from app.services.news import NewsService
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -60,7 +63,7 @@ def start_ingest(files: list[UploadFile] = File(..., description="messages.html 
     export_dir = _save_uploads(files, names)
     try:
         ingest_job.start(export_dir, label=f"upload: {', '.join(names)}", cleanup=export_dir)
-    except ingest_job.IngestRunning:
+    except IngestRunning:
         shutil.rmtree(export_dir, ignore_errors=True)
         raise HTTPException(status_code=409, detail="An ingest is already running")
     return {"state": "running", "files": names}
@@ -72,6 +75,6 @@ def ingest_status():
 
 
 @router.post("/news/refresh", dependencies=[Depends(require_admin)])
-def refresh_news():
+def refresh_news(news: NewsService = Depends(get_news)):
     """Re-fetch every current-affairs feed in sources.toml now."""
     return news.refresh(force=True)

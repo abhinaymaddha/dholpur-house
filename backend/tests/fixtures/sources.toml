@@ -1,0 +1,15 @@
+refresh_hours = 6
+keep_days = 21
+
+[[source]]
+name = "World"
+url = "https://feeds.test/world.rss"
+topics = ["International Relations", "Economy"]
+
+[[source]]
+name = "National"
+url = "https://feeds.test/national.rss"
+
+[[source]]
+name = "Broken"
+url = "https://feeds.test/broken.rss"

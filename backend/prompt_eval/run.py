@@ -12,7 +12,9 @@ import sys
 from pathlib import Path
 
 from app.database import pool
-from app.interview import bank, engine, evaluator
+from app.dependencies import get_bank, get_interviews, get_question_sources
+from app.interview import evaluator
+from app.interview.session import Filters, InterviewSession
 
 HERE = Path(__file__).parent
 
@@ -22,7 +24,7 @@ def run_evaluator(only: list[str]) -> None:
         if only and c["id"] not in only:
             continue
         exchange = f"Board: {c['question']}\nCandidate: {c['answer']}"
-        pairs = [(r["text"], r["follow_up"]) for r in bank.similar([c["question"]], n=12) if r["follow_up"]][:5]
+        pairs = [(r["text"], r["follow_up"]) for r in get_bank().similar([c["question"]], n=12) if r["follow_up"]][:5]
         e, follow_up = evaluator.evaluate(c["topic"], c["context"], c["reference"], exchange, c["answer"], 2, pairs)
         print(f"\n{'=' * 100}\n{c['id']}  (expect: {c['expect']})")
         print(f"verdict: {e['verdict']}  avg {e['average']}  {e['scores']}")
@@ -41,9 +43,10 @@ def run_questions(only: list[str]) -> None:
         if only and c["id"] not in only:
             continue
         print(f"\n{'=' * 100}\n{c['id']}  topics={c['topics']} board={c['board']} daf={'yes' if c['daf'] else 'no'}")
-        sid = None
+        session = InterviewSession.open(None, get_interviews(), get_bank(), get_question_sources())
+        filters = Filters(topics=c["topics"], board=c["board"], daf=c["daf"])
         for _ in range(c["count"]):
-            sid, turn = engine.next_question(sid, c["topics"], c["board"], c["daf"], "generated")
+            turn = session.next_question(filters)
             s = turn["source"]
             print(f"- [{s.get('target_angle')} -> {s['angle']}] {turn['question']}\n    builds on: {s['based_on']}"
                   f"{' | DAF item: ' + s['daf_item'] if s.get('daf_item') else ''}{' | article: ' + s['title'] if s.get('title') else ''}")

@@ -14,11 +14,10 @@ from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
-from psycopg import connect
 from psycopg.types.json import Jsonb
 
 from app.config import settings
-from app.database import init_schema
+from app.repositories.transcripts import TranscriptRepository
 from app.services.embeddings import embed
 
 from .parse import parse_export
@@ -113,31 +112,11 @@ def run_ingest(source: Path, log: Callable[[str], None] = print) -> dict:
     for row, vec in zip(question_rows, embed([r["text"] for r in question_rows])):
         row["embedding"] = vec
 
-    with connect(settings.database_url, autocommit=False) as conn:
-        init_schema(conn)
-        conn.execute("TRUNCATE questions, chunks, transcripts, held RESTART IDENTITY")
-        with conn.cursor() as cur:
-            cur.executemany(
-                "INSERT INTO transcripts (id, message_ids, posted_at, telegram_url, board, alias, interview_date, daf,"
-                " optional_subject, pt_marks, exam, cse_year, reactions, duplicates, text, background, optional_tag,"
-                " states, interests, topics, question_count, structure) VALUES"
-                " (%(id)s, %(message_ids)s, %(posted_at)s, %(telegram_url)s, %(board)s, %(alias)s, %(interview_date)s,"
-                " %(daf)s, %(optional_subject)s, %(pt_marks)s, %(exam)s, %(cse_year)s, %(reactions)s, %(duplicates)s,"
-                " %(text)s, %(background)s, %(optional_tag)s, %(states)s, %(interests)s, %(topics)s,"
-                " %(question_count)s, %(structure)s)", rows)
-            cur.executemany(
-                "INSERT INTO held (id, reason, message_ids, posted_at, text) VALUES (%s, %s, %s, %s, %s)",
-                [(u["unit_id"], r, u["message_ids"], datetime.fromisoformat(u["posted_at"]), u["text"])
-                 for u, r in held])
-            cur.executemany(
-                "INSERT INTO chunks (transcript_id, seq, section, text, embedding) VALUES (%s, %s, %s, %s, %s)",
-                [(c["transcript_id"], c["seq"], c["section"], c["text"], v) for c, v in zip(chunk_rows, vectors)])
-            cur.executemany(
-                "INSERT INTO questions (id, transcript_id, seq, member, text, topics, prev_id, embedding) VALUES"
-                " (%(id)s, %(transcript_id)s, %(seq)s, %(member)s, %(text)s, %(topics)s, %(prev_id)s, %(embedding)s)",
-                question_rows)
-            cur.execute("SELECT setval('questions_id_seq', GREATEST((SELECT max(id) FROM questions), 1))")
-        conn.commit()
+    TranscriptRepository.replace_all(
+        rows,
+        [(u["unit_id"], r, u["message_ids"], datetime.fromisoformat(u["posted_at"]), u["text"]) for u, r in held],
+        [(c["transcript_id"], c["seq"], c["section"], c["text"], v) for c, v in zip(chunk_rows, vectors)],
+        question_rows)
 
     summary = {
         "messages": len(msgs), "units": len(units), "transcripts": len(rows), "held": len(held),
