@@ -45,7 +45,7 @@ export function FacetSidebar({ facets, filters, onChange }: {
 
       <section>
         <Heading>Topics asked</Heading>
-        <p className="mb-1.5 text-xs text-slate-400">Pick several to narrow down</p>
+        <p className="mb-1.5 text-xs text-stone-400">Pick several to narrow down</p>
         <div className="flex flex-wrap gap-1.5">
           {facets?.topic.map((t) => {
             const on = filters.topics.includes(t.value)
@@ -54,10 +54,10 @@ export function FacetSidebar({ facets, filters, onChange }: {
                 key={t.value}
                 onClick={() => toggleTopic(t.value)}
                 className={`rounded-full border px-2.5 py-1 text-xs transition ${on
-                  ? 'border-violet-500 bg-violet-600 text-white'
-                  : 'border-slate-200 text-slate-700 hover:border-violet-400 dark:border-slate-700 dark:text-slate-300'}`}
+                  ? 'border-teak-500 bg-teak-600 text-white'
+                  : 'border-stone-200 text-stone-700 hover:border-teak-400 dark:border-stone-700 dark:text-stone-300'}`}
               >
-                {t.value} <span className={on ? 'text-violet-200' : 'text-slate-400'}>{t.count}</span>
+                {t.value} <span className={on ? 'text-teak-200' : 'text-stone-400'}>{t.count}</span>
               </button>
             )
           })}
@@ -76,15 +76,15 @@ export function FacetSidebar({ facets, filters, onChange }: {
 
       <section>
         <Heading>More</Heading>
-        <label className="flex cursor-pointer items-center gap-2 text-slate-700 dark:text-slate-300">
-          <input type="checkbox" checked={filters.has_marks} onChange={(e) => set({ has_marks: e.target.checked })} className="accent-indigo-600" />
-          PT marks reported <span className="text-slate-400">{facets?.has_marks ?? ''}</span>
+        <label className="flex cursor-pointer items-center gap-2 text-stone-700 dark:text-stone-300">
+          <input type="checkbox" checked={filters.has_marks} onChange={(e) => set({ has_marks: e.target.checked })} className="accent-sandstone-600" />
+          PT marks reported <span className="text-stone-400">{facets?.has_marks ?? ''}</span>
         </label>
         {(facets?.exam.length ?? 0) > 1 && (
           <div className="mt-2 flex gap-1.5">
             {facets!.exam.map((x) => (
               <button key={x.value} onClick={() => set({ exam: filters.exam === x.value ? '' : x.value })}
-                className={`rounded-md border px-2 py-0.5 text-xs ${filters.exam === x.value ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300' : 'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-400'}`}>
+                className={`rounded-md border px-2 py-0.5 text-xs ${filters.exam === x.value ? 'border-sandstone-500 bg-sandstone-50 text-sandstone-700 dark:bg-sandstone-500/10 dark:text-sandstone-300' : 'border-stone-200 text-stone-600 dark:border-stone-700 dark:text-stone-400'}`}>
                 {x.value} {x.count}
               </button>
             ))}
@@ -96,7 +96,7 @@ export function FacetSidebar({ facets, filters, onChange }: {
 }
 
 function Heading({ children }: { children: React.ReactNode }) {
-  return <h3 className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">{children}</h3>
+  return <h3 className="mb-2 text-xs font-semibold tracking-wide text-stone-500 uppercase dark:text-stone-400">{children}</h3>
 }
 
 function Row({ label, count, active, onClick, indent = false }: {
@@ -105,10 +105,10 @@ function Row({ label, count, active, onClick, indent = false }: {
   return (
     <button onClick={onClick}
       className={`flex w-full items-center justify-between rounded-md px-2 py-1 text-left ${indent ? 'pl-7' : ''} ${active
-        ? 'bg-indigo-50 font-medium text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300'
-        : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}`}>
+        ? 'bg-sandstone-50 font-medium text-sandstone-700 dark:bg-sandstone-500/10 dark:text-sandstone-300'
+        : 'text-stone-700 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-800'}`}>
       <span className="flex items-center gap-1.5 truncate">{active && <Check size={13} />}{label}</span>
-      <span className="text-xs text-slate-400">{count}</span>
+      <span className="text-xs text-stone-400">{count}</span>
     </button>
   )
 }
@@ -121,7 +121,7 @@ function YearNode({ year, count, boards, filters, onYear, onBoard }: {
   return (
     <li>
       <div className="flex items-center">
-        <button aria-label={open ? 'Collapse' : 'Expand'} onClick={() => setOpen(!open)} className="p-1 text-slate-400">
+        <button aria-label={open ? 'Collapse' : 'Expand'} onClick={() => setOpen(!open)} className="p-1 text-stone-400">
           {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </button>
         <div className="flex-1"><Row label={`CSE ${year}`} count={count} active={inYear && !filters.board} onClick={onYear} /></div>
@@ -154,7 +154,7 @@ function FacetGroup({ label, values, selected, onSelect }: {
         ))}
       </ul>
       {values.length > 6 && (
-        <button onClick={() => setAll(!all)} className="mt-1 px-2 text-xs text-indigo-600 hover:underline dark:text-indigo-400">
+        <button onClick={() => setAll(!all)} className="mt-1 px-2 text-xs text-sandstone-600 hover:underline dark:text-sandstone-400">
           {all ? 'Show less' : `Show all ${values.length}`}
         </button>
       )}

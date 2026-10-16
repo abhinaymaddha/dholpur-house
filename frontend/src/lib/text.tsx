@@ -42,7 +42,7 @@ function inline(text: string, onCite: (n: number) => void, keyBase: string): Rea
         <button
           key={`${keyBase}-${m.index}`}
           onClick={() => onCite(n)}
-          className="mx-0.5 rounded bg-indigo-100 px-1.5 py-px align-baseline text-xs font-semibold text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-300"
+          className="mx-0.5 rounded bg-sandstone-100 px-1.5 py-px align-baseline text-xs font-semibold text-sandstone-700 hover:bg-sandstone-200 dark:bg-sandstone-500/20 dark:text-sandstone-300"
         >
           S{n}
         </button>,

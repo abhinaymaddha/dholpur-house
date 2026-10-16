@@ -1,11 +1,144 @@
 @import "tailwindcss";
 
+/*
+ * Dholpur House theme, taken from the building itself (UPSC, Shahjahan Road, 1920s Art Deco):
+ * lime-plaster walls (stone), the Dholpur red sandstone cornice bands (sandstone), buff sandstone
+ * trim, the lawns (lawn), brass fittings (brass), teak doors (teak) and wrought-iron railings (iron).
+ */
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Jost", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Marcellus", "Jost", ui-serif, Georgia, serif;
+  --font-serif: "Source Serif 4", ui-serif, Georgia, serif;
+
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+  --radius-xl: 6px;
+  --radius-2xl: 8px;
+
+  --color-stone-50: #faf6ee;
+  --color-stone-100: #f2ece0;
+  --color-stone-200: #e5dccb;
+  --color-stone-300: #d2c6b1;
+  --color-stone-400: #a99d88;
+  --color-stone-500: #7f7666;
+  --color-stone-600: #625a4e;
+  --color-stone-700: #4a443b;
+  --color-stone-800: #332f29;
+  --color-stone-900: #221f1b;
+  --color-stone-950: #161412;
+
+  --color-sandstone-50: #fbf3f0;
+  --color-sandstone-100: #f5e1da;
+  --color-sandstone-200: #ebc3b6;
+  --color-sandstone-300: #dc9a86;
+  --color-sandstone-400: #c96f57;
+  --color-sandstone-500: #b4523b;
+  --color-sandstone-600: #9c3d2e;
+  --color-sandstone-700: #7e2f23;
+  --color-sandstone-800: #64271e;
+  --color-sandstone-900: #4f211a;
+  --color-sandstone-950: #2c110c;
+
+  --color-lawn-50: #f1f6ec;
+  --color-lawn-100: #dfead3;
+  --color-lawn-200: #c1d7aa;
+  --color-lawn-300: #9cbe7a;
+  --color-lawn-400: #79a352;
+  --color-lawn-500: #5b8838;
+  --color-lawn-600: #4c6f2f;
+  --color-lawn-700: #3c5826;
+  --color-lawn-800: #31461f;
+  --color-lawn-900: #283a1b;
+  --color-lawn-950: #142010;
+
+  --color-brass-50: #fbf6ea;
+  --color-brass-100: #f5e8c8;
+  --color-brass-200: #ebd08f;
+  --color-brass-300: #dfb45a;
+  --color-brass-400: #d19c3a;
+  --color-brass-500: #b8832a;
+  --color-brass-600: #9a6820;
+  --color-brass-700: #7b501c;
+  --color-brass-800: #65411c;
+  --color-brass-900: #55371b;
+  --color-brass-950: #301d0c;
+
+  --color-teak-50: #f8f3ef;
+  --color-teak-100: #ede1d6;
+  --color-teak-200: #dbc2ad;
+  --color-teak-300: #c39c7e;
+  --color-teak-400: #a87a59;
+  --color-teak-500: #8f6244;
+  --color-teak-600: #764e37;
+  --color-teak-700: #5f3f2e;
+  --color-teak-800: #4e3428;
+  --color-teak-900: #3b2a20;
+  --color-teak-950: #22170f;
+
+  --color-iron-50: #f2f5f6;
+  --color-iron-100: #e1e7ea;
+  --color-iron-200: #c4d0d5;
+  --color-iron-300: #9fb1b9;
+  --color-iron-400: #7a8f99;
+  --color-iron-500: #5f747e;
+  --color-iron-600: #4b5d66;
+  --color-iron-700: #3f4d55;
+  --color-iron-800: #374148;
+  --color-iron-900: #30383e;
+  --color-iron-950: #1d2327;
+
+  /* Tiranga: the flag's own colours, used only as a thin band */
+  --color-saffron: #ff9933;
+  --color-india-green: #138808;
+}
+
+@layer base {
+  h1, h2 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    letter-spacing: 0.02em;
+  }
+}
+
+@layer components {
+  /* The three-colour band along the top of the page and above the footer dedication. */
+  .tiranga {
+    background: linear-gradient(to bottom, var(--color-saffron) 0 33.34%, #ffffff 33.34% 66.67%,
+      var(--color-india-green) 66.67% 100%);
+  }
+  .tiranga-row {
+    background: linear-gradient(to right, var(--color-saffron) 0 33.34%, #ffffff 33.34% 66.67%,
+      var(--color-india-green) 66.67% 100%);
+  }
+
+  /* The red sandstone cornice: a thick band over a thin buff line, as on the facade. */
+  .cornice {
+    border-bottom: 3px solid var(--color-sandstone-600);
+    box-shadow: 0 3px 0 0 var(--color-stone-50), 0 4px 0 0 var(--color-brass-300);
+  }
+  @media (prefers-color-scheme: dark) {
+    .cornice { box-shadow: 0 3px 0 0 var(--color-stone-900), 0 4px 0 0 var(--color-brass-700); }
+    .jali { --jali-gap: var(--color-stone-900); }
+  }
+
+  /* The pierced vertical jali screens beside the entrance, as a faint pattern. */
+  .jali {
+    background-image: repeating-linear-gradient(to right, transparent 0 9px, currentColor 9px 11px, transparent 11px 20px),
+      repeating-linear-gradient(to bottom, transparent 0 14px, var(--jali-gap, #faf6ee) 14px 18px);
+    opacity: 0.09;
+    mask-image: linear-gradient(to left, black, transparent);
+  }
+
+  .wordmark {
+    font-family: var(--font-display);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+  }
 }
 
 mark {
-  background-color: color-mix(in oklab, var(--color-amber-300) 70%, transparent);
+  background-color: color-mix(in oklab, var(--color-brass-300) 60%, transparent);
   color: inherit;
   border-radius: 2px;
   padding: 0 1px;
