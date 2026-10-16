@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
-from app.services.llm import stream_text
+from app import llm
 
 MODEL = "model_1"
 
@@ -31,7 +31,7 @@ def build_context(sources: list[dict]) -> str:
 
 
 def stream_answer(question: str, sources: list[dict]) -> Iterator[str]:
-    return stream_text(MODEL, [
+    return llm.stream_text(MODEL, [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": f"Sources:\n\n{build_context(sources)}\n\nQuestion: {question}"},
     ])

@@ -1,6 +1,8 @@
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+addopts = "--cov=app --cov-report=term-missing:skip-covered --cov-fail-under=95"
+filterwarnings = ["ignore:The anyio.abc.BlockingPortal alias is deprecated:DeprecationWarning"]
 
 [tool.black]
 line-length = 110

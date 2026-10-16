@@ -6,14 +6,15 @@ Events: `sources` (JSON list, sent first), `delta` (answer text, many), `error`,
 import json
 import logging
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse
 
+from app.dependencies import get_retriever
+from app.errors import AppError
 from app.schemas.ask import AskRequest
 from app.services.answer import stream_answer
-from app.services.llm import LLMError
-from app.services.retrieval import retrieve
+from app.services.retrieval import HybridRetriever
 
 router = APIRouter(prefix="/api", tags=["ask"])
 logger = logging.getLogger(__name__)
@@ -24,9 +25,9 @@ def _sse(event: str, data) -> str:
 
 
 @router.post("/ask")
-def ask(req: AskRequest):
+def ask(req: AskRequest, retriever: HybridRetriever = Depends(get_retriever)):
     def events():
-        sources = retrieve(req.question, req.filters, top_k=req.top_k, q=req.q)
+        sources = retriever.retrieve(req.question, req.filters, top_k=req.top_k, q=req.q)
         yield _sse("sources", sources)
         if not sources:
             yield _sse("error", "No transcripts matched. Try different words or remove filters.")
@@ -34,7 +35,7 @@ def ask(req: AskRequest):
         try:
             for delta in stream_answer(req.question, sources):
                 yield _sse("delta", delta)
-        except LLMError as e:
+        except AppError as e:
             logger.warning("LLM failed: %s", e)
             yield _sse("error", str(e))
             return

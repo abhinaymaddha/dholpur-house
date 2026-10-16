@@ -8,16 +8,13 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
+from app.errors import IngestRunning
 from app.ingest.pipeline import run_ingest
 
 logger = logging.getLogger(__name__)
 
 _lock = threading.Lock()
 _job: dict = {"state": "idle"}
-
-
-class IngestRunning(RuntimeError):
-    pass
 
 
 def _now() -> str:
@@ -44,11 +41,12 @@ def _run(source: Path, cleanup: Path | None) -> None:
         _job["log"].append(line)
 
     try:
-        _job.update(state="done", summary=run_ingest(source, log=log))
+        result = {"state": "done", "summary": run_ingest(source, log=log)}
     except Exception as e:   # surface any failure through status()
         logger.exception("ingest failed")
-        _job.update(state="failed", error=str(e))
+        result = {"state": "failed", "error": str(e)}
     finally:
-        _job["finished_at"] = _now()
         if cleanup:
             shutil.rmtree(cleanup, ignore_errors=True)
+    # Only now report the outcome, so "done" means everything (including cleanup) has finished.
+    _job.update(result, finished_at=_now())

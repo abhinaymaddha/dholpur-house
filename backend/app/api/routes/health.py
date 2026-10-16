@@ -1,12 +1,12 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
-from app.database import pool
+from app.dependencies import get_transcripts
+from app.repositories import TranscriptRepository
 
 router = APIRouter(tags=["health"])
 
 
 @router.get("/health")
-def health():
-    with pool.connection() as conn:
-        conn.execute("SELECT 1")
+def health(repo: TranscriptRepository = Depends(get_transcripts)):
+    repo.ping()
     return {"status": "ok"}

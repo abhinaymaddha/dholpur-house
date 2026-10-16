@@ -8,18 +8,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from app.config import settings
+from app.errors import ConfigError
 
 DEFAULT_FILE = Path(__file__).resolve().parents[1] / "models.toml"
-KINDS = {"openrouter", "openai", "anthropic", "openai_compatible"}
 JSON_MODES = {"schema", "object", "prompt"}
 
 
-class ConfigError(ValueError):
-    pass
-
-
 @dataclass(frozen=True)
-class Provider:
+class ProviderConfig:
     name: str
     kind: str
     base_url: str | None = None
@@ -40,7 +36,7 @@ class Provider:
 @dataclass(frozen=True)
 class ModelConfig:
     key: str
-    provider: Provider
+    provider: ProviderConfig
     id: str
     max_tokens: int = 4000
     reasoning_effort: str | None = None
@@ -57,13 +53,19 @@ def _path() -> Path:
 
 
 def _parse(raw: dict) -> dict[str, ModelConfig]:
+    from app.llm.registry import kinds, provider_class   # imported here: the registry imports this module
+
     providers = {}
     for name, cfg in raw.get("providers", {}).items():
-        if cfg.get("kind") not in KINDS:
-            raise ConfigError(f"provider '{name}': kind must be one of {sorted(KINDS)}")
-        if cfg["kind"] != "anthropic" and not cfg.get("base_url"):
+        cls = provider_class(cfg.get("kind", ""))
+        if cls is None:
+            raise ConfigError(f"provider '{name}': kind must be one of {sorted(kinds())}")
+        if cls.requires_base_url and not cfg.get("base_url"):
             raise ConfigError(f"provider '{name}': base_url is required")
-        providers[name] = Provider(name=name, **cfg)
+        try:
+            providers[name] = ProviderConfig(name=name, **cfg)
+        except TypeError as e:
+            raise ConfigError(f"provider '{name}': {e}") from e
     models = {}
     for key, cfg in raw.get("models", {}).items():
         cfg = dict(cfg)
@@ -72,7 +74,10 @@ def _parse(raw: dict) -> dict[str, ModelConfig]:
             raise ConfigError(f"model '{key}': provider '{pname}' is not defined under [providers]")
         if cfg.get("json_mode", "schema") not in JSON_MODES:
             raise ConfigError(f"model '{key}': json_mode must be one of {sorted(JSON_MODES)}")
-        models[key] = ModelConfig(key=key, provider=providers[pname], **cfg)
+        try:
+            models[key] = ModelConfig(key=key, provider=providers[pname], **cfg)
+        except TypeError as e:
+            raise ConfigError(f"model '{key}': {e}") from e
     return models
 
 
