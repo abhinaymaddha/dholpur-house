@@ -73,3 +73,10 @@ def test_board_spellings():
 def test_chunks_follow_member_sections():
     sections = [c["section"].lower() for c in chunks(TRANSCRIPT)]
     assert sections[0] == "header" and "chairman" in sections and "m1" in sections
+
+
+def test_contact_details_are_redacted():
+    from app.ingest.pipeline import redact
+    out = redact("Thank you!\nVinay\n[email removed]\n[phone removed]\nCall 98765 43210. Rank 873, marks 195.")
+    assert "iima" not in out and "[phone removed]" not in out and "98765 43210" not in out
+    assert out.count("[email removed]") == 1 and out.count("[phone removed]") == 2 and "873" in out and "195" in out

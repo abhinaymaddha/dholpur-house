@@ -2,7 +2,8 @@
 #
 # In Dokploy:
 #   - Compose path: ./docker-compose.prod.yml
-#   - Environment: POSTGRES_PASSWORD, OPENROUTER_API_KEY, ADMIN_TOKEN (see README)
+#   - Environment: POSTGRES_PASSWORD, ADMIN_TOKEN, and the API key(s) your models.toml providers use
+#     (OPENROUTER_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY ...). Dokploy writes them to .env.
 #   - Models per flow: backend/models.toml (committed); news feeds: backend/sources.toml
 #   - Domains: service "frontend", port 80, HTTPS on
 # No host ports are published; Traefik reaches the frontend over dokploy-network.
@@ -25,9 +26,11 @@ services:
   backend:
     build: ./backend
     restart: unless-stopped
+    env_file:
+      - path: .env               # every provider key set in Dokploy's Environment tab
+        required: false
     environment:
       DATABASE_URL: postgresql://upsc:${POSTGRES_PASSWORD}@db:5432/upsc
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       ADMIN_TOKEN: ${ADMIN_TOKEN:-}
       TELEGRAM_CHANNEL: ${TELEGRAM_CHANNEL:-https://t.me/csetranscripts}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}

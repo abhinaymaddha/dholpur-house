@@ -4,8 +4,15 @@ Configuration management using Pydantic Settings.
 Loads configuration from environment variables (or a .env file) with validation.
 """
 
+from pathlib import Path
+
+from dotenv import load_dotenv
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Put backend/.env into the environment, so each provider's API key variable named in models.toml
+# (OPENROUTER_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, ...) is found. Real environment variables win.
+load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=False)
 
 
 class Settings(BaseSettings):
@@ -35,8 +42,7 @@ class Settings(BaseSettings):
     embed_dim: int = Field(default=384, alias="EMBED_DIM")
     embed_cache_dir: str | None = Field(default=None, alias="EMBED_CACHE_DIR")
 
-    # LLMs via OpenRouter. Which model each flow uses is set in models.toml (model_1, model_2, ...).
-    openrouter_api_key: str = Field(default="", alias="OPENROUTER_API_KEY")
+    # LLM providers and model slots live in models.toml; API keys come from the environment / .env.
     models_file: str | None = Field(default=None, alias="MODELS_FILE")     # default: backend/models.toml
     sources_file: str | None = Field(default=None, alias="SOURCES_FILE")   # default: backend/sources.toml
 

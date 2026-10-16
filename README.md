@@ -8,6 +8,15 @@ Search and ask questions over UPSC Civil Services **Personality Test (interview)
 
 > Transcripts are candidates' own recollections. Answers are generated from them and can be wrong, so always check the cited sources.
 
+## Data credit
+
+All interview transcripts come from the public Telegram channel
+**[Interview Transcripts (CSPT-2026)](https://t.me/csetranscripts)** (@csetranscripts). Full credit goes to the
+channel's admins and to the candidates who shared their experiences. This project only makes them searchable and
+claims no ownership. If you are the channel admin or an author and want any of it removed, please
+[open an issue](https://github.com/abhinaymaddha/upsc-prep/issues) or contact @abhinaymaddha on GitHub and it will be
+removed. Details in [DATA.md](DATA.md).
+
 ## How it works
 
 ```
@@ -30,12 +39,13 @@ FastAPI  /api/search  /api/transcripts/{id}  /api/stats  /api/ask (server-sent e
 React (Vite + Tailwind)  Browse (search + filters + Ask AI) · Interview · transcript reader
 ```
 
-**Retrieval for Ask** runs vector similarity and full-text match over chunks, fuses the two rankings (reciprocal rank fusion), groups by transcript, and sends the top transcripts' best sections to the LLM via [OpenRouter](https://openrouter.ai). Embeddings are computed locally with [fastembed](https://github.com/qdrant/fastembed) (`paraphrase-multilingual-MiniLM-L12-v2`, handles Hindi), so only answer generation needs an API key.
+**Retrieval for Ask** runs vector similarity and full-text match over chunks, fuses the two rankings (reciprocal rank fusion), groups by transcript, and sends the top transcripts' best sections to the LLM you configure (see [Bring your own model](#bring-your-own-model)). Embeddings are computed locally with [fastembed](https://github.com/qdrant/fastembed) (`paraphrase-multilingual-MiniLM-L12-v2`, handles Hindi), so only answer generation needs an API key.
 
 ## Data
 
 `backend/seed/csetranscripts_messages.jsonl` holds every message from the public Telegram channel
-[@csetranscripts](https://t.me/csetranscripts) (text only, one JSON object per message). On first start, when the
+[@csetranscripts](https://t.me/csetranscripts) (text only, one JSON object per message, emails and phone numbers
+removed; see [DATA.md](DATA.md)). On first start, when the
 database is empty, the backend loads it automatically (a few minutes: transcripts are parsed and embedded).
 
 To load a newer export:
@@ -52,10 +62,12 @@ Every ingest replaces all data with the given messages.
 
 ## Run it locally
 
-Requirements: Docker with Compose, and an [OpenRouter API key](https://openrouter.ai/keys).
+Requirements: Docker with Compose, and an API key for an LLM provider (OpenRouter, OpenAI, Anthropic, or any
+OpenAI-compatible server; a local Ollama needs no key).
 
 ```bash
-cp backend/.env.example backend/.env        # set OPENROUTER_API_KEY
+cp backend/.env.example backend/.env        # put your provider's API key in it
+# optional: edit backend/models.toml to choose provider and models (default: a free OpenRouter model)
 docker compose up -d --build                # db + backend + frontend on http://localhost:8710
 ```
 
@@ -68,7 +80,7 @@ embedded) and downloads the embedding model (~220 MB) into a volume.
 2. Environment:
    ```
    POSTGRES_PASSWORD=<long random string>
-   OPENROUTER_API_KEY=<key>
+   OPENROUTER_API_KEY=<key>                # or OPENAI_API_KEY / ANTHROPIC_API_KEY, matching models.toml
    ADMIN_TOKEN=<long random string>        # optional, enables /api/admin/ingest
    ```
 3. Domains: service `frontend`, port `80`, HTTPS on.
@@ -76,18 +88,36 @@ embedded) and downloads the embedding model (~220 MB) into a volume.
 
 Plan for about 2 GB of RAM (embedding model + Postgres).
 
-### Models
+## Bring your own model
 
-All LLM calls go through OpenRouter. `backend/models.toml` defines numbered slots, and code refers only to the slot:
+Everything about which LLM is used lives in **`backend/models.toml`**:
+
+- **`[providers.*]`**: where requests go. `kind` is `openrouter`, `openai`, `anthropic` (official Claude SDK) or
+  `openai_compatible` (Groq, Together, DeepSeek, Mistral, Gemini's OpenAI endpoint, Ollama, vLLM, LM Studio, …),
+  plus `base_url` and the environment variable holding the key (`api_key_env`). For a private local setup you can
+  put the key inline as `api_key` instead (don't commit it).
+- **`[models.model_1|2|3]`**: the slot each part of the app uses, pointing at a provider and a model id:
 
 | Slot | Used for |
 |---|---|
 | `model_1` | Ask AI (Browse): answers from retrieved transcripts |
-| `model_2` | Interview: writes new questions from topic, DAF, news and similar past questions |
+| `model_2` | Interview: writes new questions |
 | `model_3` | Interview: critical evaluation of each answer and follow-up questions |
 
-Change a model id there and every flow using that slot switches; the file is re-read on change. The defaults are a
-free model, limited to 50 requests a day on accounts without credits; the evaluator in particular benefits from a stronger model.
+Switching, for example, the evaluator to Claude:
+
+```toml
+[models.model_3]
+provider = "anthropic"
+id = "claude-opus-5-5"
+reasoning_effort = "medium"
+fallbacks = "default"        # let the Claude API retry a declined request on a fallback model
+```
+
+and set `ANTHROPIC_API_KEY` in `backend/.env`. The file is re-read on change; no restart needed. If a provider has
+no JSON-schema support, set `json_mode = "object"` (or `"prompt"`) on the slot. The shipped default is a free
+OpenRouter model (limited to 50 requests a day on accounts without credits); the evaluator in particular benefits from
+a stronger model.
 
 ## Interview mode
 
@@ -148,9 +178,13 @@ backend/
     database.py        connection pool + schema
     api/routes/        search, transcripts, stats, ask, health
     schemas/           response and request models
-    services/          search, retrieval, llm, embeddings
+    services/          search, retrieval, llm (+ llm_openai, llm_anthropic adapters), embeddings
+    interview/         question writing, evaluation, prompts/
     ingest/            Telegram export → Postgres
   seed/                committed channel messages (JSONL), loaded on first start
+  models.toml          LLM providers and model slots
+  sources.toml         current-affairs feeds
+  prompt_eval/         prompt test cases + runner
   tests/
 frontend/
   src/
@@ -161,6 +195,12 @@ docker-compose.yml       local stack (publishes :8710)
 docker-compose.prod.yml  Dokploy stack (Traefik via dokploy-network)
 ```
 
-## About the transcripts
+## License
 
-The transcripts were shared publicly by candidates on Telegram, often under pseudonyms. Please respect that: don't use this project to attach real identities to them.
+Code, prompts and docs: [CC BY-NC 4.0](LICENSE). Free to use, share and adapt for non-commercial purposes, with
+credit. **Commercial use needs permission:** [open an issue](https://github.com/abhinaymaddha/upsc-prep/issues) or
+contact @abhinaymaddha on GitHub.
+
+The transcripts are not covered by this license; they belong to their authors (see [Data credit](#data-credit) and
+[DATA.md](DATA.md)). Candidates often posted under pseudonyms: please don't use this project to attach real identities
+to them.
