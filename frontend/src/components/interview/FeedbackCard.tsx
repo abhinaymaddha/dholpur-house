@@ -1,4 +1,4 @@
-import type { Evaluation } from '../../types'
+import type { Evaluation, EvaluationIssue } from '../../types'
 
 const VERDICT = {
   good: { label: 'Good', cls: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300' },
@@ -31,6 +31,33 @@ export function ScoreBars({ scores }: { scores: Record<string, number> }) {
   )
 }
 
+const ISSUE_LABEL: Record<EvaluationIssue['type'], { label: string; cls: string }> = {
+  factual_error: { label: 'Factual error', cls: 'bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-300' },
+  unsupported_claim: { label: 'Unsupported', cls: 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300' },
+  vague: { label: 'Vague', cls: 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300' },
+  off_topic: { label: 'Off-topic', cls: 'bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-300' },
+  missing_perspective: { label: 'One-sided', cls: 'bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-300' },
+  impractical: { label: 'Impractical', cls: 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300' },
+  tone: { label: 'Tone', cls: 'bg-violet-100 text-violet-800 dark:bg-violet-500/15 dark:text-violet-300' },
+  structure: { label: 'Structure', cls: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200' },
+}
+
+function Issue({ i }: { i: EvaluationIssue }) {
+  const tag = ISSUE_LABEL[i.type] ?? ISSUE_LABEL.structure
+  return (
+    <li className="space-y-1 rounded-md border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+      <div className="flex flex-wrap items-start gap-2">
+        <span className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold ${tag.cls}`}>{tag.label}</span>
+        {i.quote
+          ? <q className="text-slate-800 italic dark:text-slate-200">{i.quote}</q>
+          : <span className="text-slate-500 italic">Missing from your answer</span>}
+      </div>
+      <p className="text-slate-700 dark:text-slate-300">{i.why}</p>
+      {i.fix && <p className="text-slate-600 dark:text-slate-400"><span className="font-medium text-emerald-700 dark:text-emerald-400">Better: </span>{i.fix}</p>}
+    </li>
+  )
+}
+
 /** The board's critique of one answer. */
 export function FeedbackCard({ e, followUpNext }: { e: Evaluation; followUpNext: boolean }) {
   return (
@@ -43,6 +70,17 @@ export function FeedbackCard({ e, followUpNext }: { e: Evaluation; followUpNext:
       </div>
       <ScoreBars scores={e.scores} />
       <p className="leading-relaxed text-slate-800 dark:text-slate-200">{e.critique}</p>
+      {(e.issues?.length ?? 0) > 0 && (
+        <div>
+          <h4 className="mb-1.5 text-xs font-semibold text-slate-500 uppercase">Where it went wrong</h4>
+          <ul className="space-y-2">{e.issues!.map((i, n) => <Issue key={n} i={i} />)}</ul>
+        </div>
+      )}
+      {(e.strengths?.length ?? 0) > 0 && (
+        <p className="text-slate-600 dark:text-slate-400">
+          <span className="font-medium text-emerald-700 dark:text-emerald-400">What worked: </span>{e.strengths!.join(' · ')}
+        </p>
+      )}
       {e.missing_points.length > 0 && (
         <div>
           <h4 className="mb-1 text-xs font-semibold text-slate-500 uppercase">Missing</h4>

@@ -1,0 +1,56 @@
+[
+  {
+    "id": "ir_strong",
+    "expect": "good or high partial; specific issues, no invented facts",
+    "topic": "International Relations",
+    "context": "The board wrote this question for the candidate; it builds on: US pause on Iran strikes.",
+    "reference": "- News item (The Hindu, 2026-10-09): Trump says U.S. will not resume military strikes on Iran before Nov. 3 midterm elections.",
+    "question": "With the US postponing any military strike on Iran until after the midterm elections, how should India balance its energy security interests in Iran with its strategic partnership with the United States?",
+    "answer": "Sir, India's approach should rest on strategic autonomy. Our core interests are energy security, the safety of nearly nine million Indians in the Gulf, and connectivity through Chabahar to Central Asia. So first, India should use the pause to push quietly for de-escalation, keeping channels open with both Washington and Tehran. Second, we should protect Chabahar by seeking a continued sanctions carve-out from the US, arguing it serves Afghan and Central Asian stability, which the US also wants. Third, we should diversify energy imports from the US, Gulf states and Russia so that any disruption in Iran does not hit our inflation. Our partnership with the US matters for technology and defence, but it does not require us to give up our neighbourhood interests."
+  },
+  {
+    "id": "ir_vague",
+    "expect": "weak; vague issues quoted",
+    "topic": "International Relations",
+    "context": "The board wrote this question for the candidate; it builds on: US pause on Iran strikes.",
+    "reference": "- News item (The Hindu, 2026-10-09): Trump says U.S. will not resume military strikes on Iran before Nov. 3 midterm elections.",
+    "question": "With the US postponing any military strike on Iran until after the midterm elections, how should India balance its energy security interests in Iran with its strategic partnership with the United States?",
+    "answer": "India should balance both. Energy is important and US is also important. We should talk to both countries and do diplomacy."
+  },
+  {
+    "id": "polity_wrong_fact",
+    "expect": "factual_error issues quoting the wrong claims (Governor is appointed by the President, not elected; Article 370 is unrelated)",
+    "topic": "Polity & Constitution",
+    "context": "This is a real question asked in a past interview (CSE 2025, Sanjay Verma board).",
+    "reference": "",
+    "question": "What is the role of the Governor in a state, and why has it become controversial?",
+    "answer": "Sir, the Governor is elected by the state legislature for five years under Article 370 and acts as the head of the state government. The controversy is because Governors are sitting on bills for a long time and some say they act as agents of the Centre. I think the Governor should be made more powerful so that states are kept in check."
+  },
+  {
+    "id": "tone_partisan",
+    "expect": "tone <= 2 with the partisan/arrogant words quoted",
+    "topic": "Economy",
+    "context": "This is a real question asked in a past interview (CSE 2025, Suman Sharma board).",
+    "reference": "",
+    "question": "Are freebies good or bad for our democracy?",
+    "answer": "Freebies are a disease spread by opposition parties to buy votes, and anyone who supports them is frankly anti-national. I am 100 percent sure that no educated person can defend them. The government should simply ban them, end of story."
+  },
+  {
+    "id": "situational_good",
+    "expect": "good or high partial; practical steps recognised",
+    "topic": "Situational / Hypothetical",
+    "context": "The board wrote this question for the candidate; it builds on: flood in home district.",
+    "reference": "",
+    "question": "You are DM of a district where floods have hit 40 villages overnight and the local MLA is pressing you to send relief first to his constituency. What will you do?",
+    "answer": "Sir, my first step would be to activate the district disaster management plan and the emergency operations centre, and get the SDRF and NDRF teams moving to the worst-hit villages based on actual damage reports, not on political pressure. Relief priority would follow need: people trapped, the elderly, pregnant women and children first. I would respectfully explain to the MLA that distribution follows a need-based list that is public, and invite him to help by mobilising volunteers in his area, so he becomes part of the effort. In parallel I would set up relief camps, ensure drinking water and medical teams to prevent disease, and keep the public informed through a daily bulletin. Once the immediate crisis is over, I would start damage assessment for compensation and review why these villages flooded."
+  },
+  {
+    "id": "ethics_average",
+    "expect": "partial; balanced but thin",
+    "topic": "Ethics & Values",
+    "context": "This is a real question asked in a past interview (CSE 2024, Sanjay Verma board).",
+    "reference": "",
+    "question": "Surrogacy in India: what are the ethical issues, and what should be done about it?",
+    "answer": "Sir, surrogacy raises issues of exploitation of poor women and commercialisation of the body, but it also helps childless couples. So we need a balanced approach where it is regulated properly and the rights of the surrogate mother and the child are protected."
+  }
+]

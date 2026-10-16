@@ -130,10 +130,19 @@ export interface SimilarQuestion {
   alias: string | null
 }
 
+export interface EvaluationIssue {
+  quote: string | null
+  type: 'factual_error' | 'unsupported_claim' | 'vague' | 'off_topic' | 'missing_perspective' | 'impractical' | 'tone' | 'structure'
+  why: string
+  fix: string
+}
+
 export interface Evaluation {
   scores: Record<string, number>
   average: number
   verdict: 'good' | 'partial' | 'weak'
+  issues?: EvaluationIssue[]      // absent on evaluations saved before issues were introduced
+  strengths?: string[]
   critique: string
   missing_points: string[]
   model_answer_points: string[]
