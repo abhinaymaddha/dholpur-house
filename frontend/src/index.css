@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Dark mode follows the .dark class on <html> (header toggle; defaults to the system setting). */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /*
  * Dholpur House theme, taken from the building itself (UPSC, Shahjahan Road, 1920s Art Deco):
  * lime-plaster walls (stone), the Dholpur red sandstone cornice bands (sandstone), buff sandstone
@@ -23,10 +26,10 @@
   --color-stone-400: #a99d88;
   --color-stone-500: #7f7666;
   --color-stone-600: #625a4e;
-  --color-stone-700: #4a443b;
-  --color-stone-800: #332f29;
-  --color-stone-900: #221f1b;
-  --color-stone-950: #161412;
+  --color-stone-700: #5a4a3d;
+  --color-stone-800: #3d3129;
+  --color-stone-900: #2b221c;
+  --color-stone-950: #1f1813;
 
   --color-sandstone-50: #fbf3f0;
   --color-sandstone-100: #f5e1da;
@@ -117,10 +120,8 @@
     border-bottom: 3px solid var(--color-sandstone-600);
     box-shadow: 0 3px 0 0 var(--color-stone-50), 0 4px 0 0 var(--color-brass-300);
   }
-  @media (prefers-color-scheme: dark) {
-    .cornice { box-shadow: 0 3px 0 0 var(--color-stone-900), 0 4px 0 0 var(--color-brass-700); }
-    .jali { --jali-gap: var(--color-stone-900); }
-  }
+  .dark .cornice { box-shadow: 0 3px 0 0 var(--color-stone-900), 0 4px 0 0 var(--color-brass-700); }
+  .dark .jali { --jali-gap: var(--color-stone-900); }
 
   /* The pierced vertical jali screens beside the entrance, as a faint pattern. */
   .jali {

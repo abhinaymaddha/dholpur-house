@@ -1,8 +1,9 @@
-import { FolderTree, GraduationCap } from 'lucide-react'
+import { FolderTree, GraduationCap, Moon, Sun } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { BrowseView } from './components/BrowseView'
 import { InterviewView } from './components/interview/InterviewView'
 import { TranscriptPanel } from './components/TranscriptPanel'
+import { currentTheme, setTheme, type Theme } from './lib/theme'
 import { getStats } from './services/api'
 import type { Stats } from './types'
 
@@ -17,6 +18,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>(tabFromHash)
   const [stats, setStats] = useState<Stats | null>(null)
   const [open, setOpen] = useState<{ id: string; query: string } | null>(null)
+  const [theme, setThemeState] = useState<Theme>(currentTheme)
   const [askOpen, setAskOpen] = useState(() => window.location.hash === '#ask')
 
   useEffect(() => {
@@ -28,6 +30,12 @@ export default function App() {
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
+
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark'
+    setTheme(next)
+    setThemeState(next)
+  }
 
   const openTranscript = useCallback((id: string, query: string) => setOpen({ id, query }), [])
   const closeTranscript = useCallback(() => setOpen(null), [])
@@ -43,13 +51,24 @@ export default function App() {
               <img src="/favicon.svg" alt="" className="h-8 w-8" />Dholpur House
             </h1>
             <p className="mt-0.5 text-sm text-stone-600 dark:text-stone-400">
-              {stats ? `UPSC interview prep · ${stats.transcripts.toLocaleString()} real Personality Test transcripts` : 'UPSC interview prep from real Personality Test transcripts'}
+              UPSC interview prep from real Personality Test transcripts
             </p>
           </div>
+          <div className="flex items-center gap-2">
           <nav className="flex gap-1 rounded-md border border-stone-200 bg-white/70 p-1 dark:border-stone-700 dark:bg-stone-800/70">
             <TabButton active={tab === 'browse'} href="#browse" icon={<FolderTree size={15} />} label="Browse" />
             <TabButton active={tab === 'interview'} href="#interview" icon={<GraduationCap size={15} />} label="Interview" />
           </nav>
+          <button
+            type="button"
+            onClick={toggleTheme}
+            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+            className="rounded-md border border-stone-200 bg-white/70 p-2 text-stone-600 transition hover:text-sandstone-700 dark:border-stone-700 dark:bg-stone-800/70 dark:text-brass-300 dark:hover:text-brass-200"
+          >
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+          </div>
         </div>
       </header>
 
