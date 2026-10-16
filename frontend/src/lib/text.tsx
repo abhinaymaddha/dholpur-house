@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-// Must match HL_START / HL_END in backend/app/services/search.py
+// Must match HL_START / HL_END in backend/app/repositories/transcripts.py
 const HL = /⟦(.*?)⟧/gs
 
 /** Render a backend snippet: plain text with highlight markers turned into <mark>. No HTML is injected. */
@@ -14,18 +14,6 @@ export function Snippet({ text }: { text: string }) {
   }
   parts.push(text.slice(last))
   return <>{parts}</>
-}
-
-/** Highlight the query's words inside a full transcript. */
-export function highlightTerms(text: string, query: string): ReactNode {
-  const words = query
-    .replace(/["()-]/g, ' ')
-    .split(/\s+/)
-    .filter((w) => w.length > 2 && w.toLowerCase() !== 'or')
-    .map((w) => w.replace(/[.*+?^${}|[\]\\]/g, '\\$&'))
-  if (!words.length) return text
-  const re = new RegExp(`(${words.join('|')})`, 'gi')
-  return text.split(re).map((part, i) => (i % 2 ? <mark key={i}>{part}</mark> : part))
 }
 
 /** Inline markdown subset for answers: **bold** and [S1] citations (some models write 【S1】). */
@@ -80,8 +68,4 @@ export function Answer({ text, onCite }: { text: string; onCite: (n: number) => 
   })
   flush()
   return <div className="leading-relaxed">{blocks}</div>
-}
-
-export function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
 }

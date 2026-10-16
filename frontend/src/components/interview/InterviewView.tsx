@@ -26,7 +26,7 @@ function save(state: { sessionId: string | null; mode: Mode; filters: InterviewF
 
 /** Interview mode: filters on the left, a conversation with the board on the right. */
 export function InterviewView({ stats, onOpen }: { stats: Stats | null; onOpen: (id: string, query: string) => void }) {
-  const initial = useRef(load()).current
+  const [initial] = useState(load)
   const [topics, setTopics] = useState<InterviewTopic[]>([])
   const [filters, setFilters] = useState<InterviewFilters>(initial.filters)
   const [mode, setMode] = useState<Mode>(initial.mode)

@@ -105,7 +105,7 @@ export default function App() {
         </div>
       </footer>
 
-      {open && <TranscriptPanel id={open.id} query={open.query} onClose={closeTranscript} />}
+      {open && <TranscriptPanel key={open.id} id={open.id} query={open.query} onClose={closeTranscript} />}
     </div>
   )
 }

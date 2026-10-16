@@ -19,32 +19,36 @@ export function BrowseView({ stats, askOpen, onAskOpen, onOpen }: {
   const [q, setQ] = useState('')
   const query = useDebounce(q.trim(), 300)
   const [filters, setFilters] = useState<Filters>(emptyFilters)
-  const [sort, setSort] = useState<SortOrder>('relevance')
+  const [sortChoice, setSort] = useState<SortOrder>('relevance')
+  // "Newest first" is a separate option only while searching; without keywords relevance already means newest.
+  const sort: SortOrder = !query && sortChoice === 'recent' ? 'relevance' : sortChoice
   const [facets, setFacets] = useState<Facets | null>(null)
   const [hits, setHits] = useState<SearchHit[]>([])
   const [total, setTotal] = useState(0)
-  const [loading, setLoading] = useState(false)
+  const [loadedKey, setLoadedKey] = useState('')
+  const [loadingMore, setLoadingMore] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
+
+  // Loading is derived: the results on screen are for a different search than the one requested.
+  const requestKey = JSON.stringify([query, filters, sort])
+  const loading = loadedKey !== requestKey || loadingMore
 
   useEffect(() => {
     let stale = false
-    setLoading(true)
     Promise.all([getFacets(filters, query), searchTranscripts(query, filters, 0, PAGE, sort)])
       .then(([f, r]) => { if (!stale) { setFacets(f); setHits(r.hits); setTotal(r.total) } })
-      .finally(() => { if (!stale) setLoading(false) })
+      .catch(() => { if (!stale) { setHits([]); setTotal(0) } })
+      .finally(() => { if (!stale) setLoadedKey(requestKey) })
     return () => { stale = true }
-  }, [query, filters, sort])
-
-  // "Newest first" is a separate option only while searching; without keywords relevance already means newest.
-  useEffect(() => { if (!query && sort === 'recent') setSort('relevance') }, [query, sort])
+  }, [query, filters, sort, requestKey])
 
   const loadMore = async () => {
-    setLoading(true)
+    setLoadingMore(true)
     try {
       const r = await searchTranscripts(query, filters, hits.length, PAGE, sort)
       setHits((h) => [...h, ...r.hits])
     } finally {
-      setLoading(false)
+      setLoadingMore(false)
     }
   }
 
