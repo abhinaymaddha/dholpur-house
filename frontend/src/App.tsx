@@ -59,8 +59,19 @@ export default function App() {
         {tab === 'interview' && <InterviewView stats={stats} onOpen={openTranscript} />}
       </main>
 
-      <footer className="mx-auto max-w-6xl px-4 pb-8 text-xs text-slate-400">
-        Transcripts are candidates' own recollections, shared publicly on Telegram. Answers are AI-generated from them and may be wrong — check the sources.
+      <footer className="mx-auto max-w-6xl space-y-1 px-4 pb-8 text-xs text-slate-400">
+        <p>
+          All transcripts come from the Telegram channel{' '}
+          <a href="https://t.me/csetranscripts" target="_blank" rel="noreferrer" className="underline hover:text-indigo-600">
+            Interview Transcripts (CSPT-2026)
+          </a>
+          . Full credit to its admins and to the candidates who shared their experiences. Want something removed?{' '}
+          <a href="https://github.com/abhinaymaddha/upsc-prep/issues" target="_blank" rel="noreferrer" className="underline hover:text-indigo-600">
+            Get in touch
+          </a>
+          .
+        </p>
+        <p>Transcripts are candidates' own recollections. AI answers and feedback may be wrong — check the sources.</p>
       </footer>
 
       {open && <TranscriptPanel id={open.id} query={open.query} onClose={closeTranscript} />}

@@ -1,25 +1,78 @@
-# Models used by the app, all called through OpenRouter (https://openrouter.ai/models).
+# LLM configuration: which provider and model each part of the app uses.
 #
-# Code refers to these keys (model_1, model_2, ...), never to a model id, so changing a model
-# here switches every flow that uses it. The file is re-read when it changes; no restart needed.
+# Code refers only to the model slots (model_1, model_2, model_3), so changing a slot here switches
+# every flow that uses it. The file is re-read when it changes; no restart needed.
 #
-#   model_1  Ask tab: answers questions from retrieved transcripts (streamed)
-#   model_2  Interview: writes new questions from current-affairs articles or the candidate's DAF
-#   model_3  Interview: evaluates each answer critically and writes follow-up questions
+#   model_1  Browse > Ask AI: answers questions from retrieved transcripts (streamed)
+#   model_2  Interview: writes new questions
+#   model_3  Interview: evaluates each answer critically and writes follow-ups
 #
-# Fields: id (OpenRouter slug), max_tokens, reasoning_effort (low | medium | high), temperature (optional)
+# To use your own model: pick (or add) a provider below, put its API key in backend/.env under the
+# name in `api_key_env` (or, for a private local setup only, in `api_key`), and point the slots at it.
 
-[model_1]
+# ---------- providers ----------
+# kind:
+#   openrouter         OpenRouter (https://openrouter.ai), hundreds of models behind one key
+#   openai             OpenAI's API
+#   anthropic          Anthropic's Claude API (official SDK)
+#   openai_compatible  any other server speaking the OpenAI chat-completions API:
+#                      Groq, Together, DeepSeek, Mistral, Gemini's OpenAI endpoint, Ollama, vLLM, LM Studio...
+
+[providers.openrouter]
+kind = "openrouter"
+base_url = "https://openrouter.ai/api/v1"
+api_key_env = "OPENROUTER_API_KEY"
+
+[providers.openai]
+kind = "openai"
+base_url = "https://api.openai.com/v1"
+api_key_env = "OPENAI_API_KEY"
+
+[providers.anthropic]
+kind = "anthropic"
+api_key_env = "ANTHROPIC_API_KEY"
+# base_url = "https://api.anthropic.com"    # only to route through a proxy
+
+[providers.ollama]
+kind = "openai_compatible"
+base_url = "http://localhost:11434/v1"   # a local Ollama server; no key needed
+api_key = "ollama"
+
+# ---------- model slots ----------
+# Fields:
+#   provider          a provider name from above
+#   id                the model id at that provider
+#   max_tokens        output cap per call
+#   reasoning_effort  low | medium | high (optional; sent in the provider's own format)
+#   temperature       optional; leave out for models that don't accept it (e.g. reasoning models)
+#   json_mode         how Interview gets structured answers back:
+#                       schema (default): the provider enforces a JSON schema
+#                       object: plain JSON mode, schema described in the prompt
+#                       prompt: no JSON mode at all, for servers without either (least reliable)
+#   fallbacks         anthropic only: "default" lets the Claude API re-run a declined request on a
+#                     fallback model instead of returning a refusal
+
+[models.model_1]
+provider = "openrouter"
 id = "nvidia/nemotron-3-super-120b-a12b:free"
 max_tokens = 4000
 reasoning_effort = "low"
 
-[model_2]
+[models.model_2]
+provider = "openrouter"
 id = "nvidia/nemotron-3-super-120b-a12b:free"
 max_tokens = 3000
 reasoning_effort = "low"
 
-[model_3]
+[models.model_3]
+provider = "openrouter"
 id = "nvidia/nemotron-3-super-120b-a12b:free"
 max_tokens = 4000
 reasoning_effort = "medium"
+
+# Examples (replace a slot's settings with one of these):
+#
+#   OpenAI:      provider = "openai",     id = "gpt-5.5",          reasoning_effort = "low"
+#   Claude:      provider = "anthropic",  id = "claude-opus-5-5",  reasoning_effort = "medium", fallbacks = "default"
+#   OpenRouter:  provider = "openrouter", id = "anthropic/claude-sonnet-5.5"
+#   Local:       provider = "ollama",     id = "llama3.1",         json_mode = "object"

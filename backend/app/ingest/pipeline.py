@@ -7,6 +7,7 @@ messages). Re-running replaces everything: the messages are the source of truth.
 from __future__ import annotations
 
 import json
+import re
 import time
 from collections import Counter
 from collections.abc import Callable
@@ -29,6 +30,14 @@ from .transcripts import chunks, classify, metadata
 
 SEED_FILE = Path(__file__).resolve().parents[2] / "seed" / "csetranscripts_messages.jsonl"
 
+# Personal contact details that sometimes appear in posts; never stored or shown.
+_EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+_PHONE = re.compile(r"(?<!\d)(?:\+?91[\s-]?)?[6-9]\d{4}[\s-]?\d{5}(?!\d)")
+
+
+def redact(text: str) -> str:
+    return _PHONE.sub("[phone removed]", _EMAIL.sub("[email removed]", text))
+
 
 def load_messages(source: Path) -> list[dict]:
     """A Telegram export folder (messages*.html) or a .jsonl file of parsed messages."""
@@ -39,13 +48,15 @@ def load_messages(source: Path) -> list[dict]:
         msgs = parse_export(source)
     if not msgs:
         raise ValueError(f"no messages found in {source} (expected a Telegram export folder or a .jsonl file)")
+    for m in msgs:
+        m["text"] = redact(m["text"])
     return msgs
 
 
 def write_messages(msgs: list[dict], path: Path) -> None:
     with open(path, "w", encoding="utf-8") as f:
         for m in msgs:
-            f.write(json.dumps(m, ensure_ascii=False, sort_keys=True) + "\n")
+            f.write(json.dumps(m | {"text": redact(m["text"])}, ensure_ascii=False, sort_keys=True) + "\n")
 
 
 def _questions(transcript_id: str, outline: dict, start_id: int) -> list[dict]:
