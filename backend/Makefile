@@ -11,8 +11,8 @@ install: ## Install dependencies (incl. dev)
 dev: ## Run the API with auto-reload on :8000
 	uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
-test: ## Run tests
-	pytest tests/ -v
+test: ## Run tests with coverage (needs a test database, see README)
+	pytest
 
 ingest: ## Load a Telegram export: make ingest EXPORT="/path/to/ChatExport_..."
 	python -m app.ingest "$(EXPORT)"

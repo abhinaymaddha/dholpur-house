@@ -1,5 +1,6 @@
 import { MessageCircleQuestion } from 'lucide-react'
-import { formatDate, Snippet } from '../lib/text'
+import { formatDate } from '../lib/format'
+import { Snippet } from '../lib/text'
 import type { TranscriptMeta } from '../types'
 import { MetaLine } from './MetaLine'
 

@@ -1,6 +1,6 @@
 import { ExternalLink, Loader2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { highlightTerms } from '../lib/text'
+import { highlightTerms } from '../lib/format'
 import { getTranscript } from '../services/api'
 import type { Outline, OutlineSection, Transcript } from '../types'
 import { MetaLine } from './MetaLine'
@@ -12,9 +12,8 @@ export function TranscriptPanel({ id, query, onClose }: { id: string; query: str
   const [error, setError] = useState('')
   const [view, setView] = useState<'formatted' | 'original'>('formatted')
 
+  // App remounts the panel per transcript (key={id}), so state starts empty for each one.
   useEffect(() => {
-    setT(null)
-    setError('')
     getTranscript(id).then(setT).catch(() => setError('Could not load this transcript.'))
   }, [id])
 
@@ -109,7 +108,9 @@ function FormattedTranscript({ outline, daf, query }: { outline: Outline; daf: s
 
 function Section({ s, query }: { s: OutlineSection; query: string }) {
   const isMember = Boolean(s.member)
-  let n = 0
+  const isNote = (it: OutlineSection['items'][number]) => it.kind === 'note' || (!isMember && s.title !== 'Questions')
+  // Question numbers, counting only the items shown as questions
+  const numbers = s.items.reduce<number[]>((acc, it) => [...acc, (acc.at(-1) ?? 0) + (isNote(it) ? 0 : 1)], [])
   return (
     <section>
       <h3 className={`mb-2 flex items-baseline gap-2 border-b pb-1 ${isMember ? 'border-sandstone-100 dark:border-sandstone-900' : 'border-stone-100 dark:border-stone-800'}`}>
@@ -123,17 +124,16 @@ function Section({ s, query }: { s: OutlineSection; query: string }) {
       </h3>
       <ol className="space-y-1.5">
         {s.items.map((it, i) => {
-          if (it.kind === 'note' || !isMember && s.title !== 'Questions') {
+          if (isNote(it)) {
             return (
               <li key={i} className={`text-[14px] leading-relaxed ${isMember ? 'border-l-2 border-stone-200 pl-3 text-stone-500 italic dark:border-stone-700 dark:text-stone-400' : 'text-stone-700 dark:text-stone-300'}`}>
                 {highlightTerms(it.text, query)}
               </li>
             )
           }
-          n += 1
           return (
             <li key={i} className="flex gap-3 text-[15px] leading-relaxed text-stone-800 dark:text-stone-200">
-              <span className="w-6 shrink-0 text-right font-mono text-xs leading-6 text-stone-400">{n}</span>
+              <span className="w-6 shrink-0 text-right font-mono text-xs leading-6 text-stone-400">{numbers[i]}</span>
               <span>{highlightTerms(it.text, query)}</span>
             </li>
           )
