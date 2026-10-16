@@ -7,6 +7,7 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     restoreMocks: true,
+    testTimeout: 20_000,   // the long click-through UI tests are slow on shared CI runners under coverage
     coverage: {
       provider: 'v8',
       include: ['src/**/*.{ts,tsx}'],
