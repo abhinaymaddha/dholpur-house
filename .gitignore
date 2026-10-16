@@ -7,3 +7,4 @@ node_modules/
 dist/
 .pytest_cache/
 export/
+.DS_Store

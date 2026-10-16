@@ -3,26 +3,26 @@
 The rules live here, not in the prompt: an answer earns a follow-up only if the evaluator rates it
 good (and every score is at least 3), and a main question gets at most MAX_FOLLOWUPS follow-ups.
 
-Model slots (models.toml): model_2 writes new questions, model_3 evaluates and writes follow-ups.
+Model slots (models.toml): model_2 writes new questions; model_3 evaluates and writes follow-ups
+(app/interview/evaluator.py).
 """
 
 from __future__ import annotations
 
 import random
-from datetime import date
+import re
 from uuid import UUID
 
 from psycopg.types.json import Jsonb
 
 from app.database import pool
-from app.interview import bank, prompts
+from app.interview import bank, evaluator, prompts
+from app.interview.evaluator import SCORE_KEYS
 from app.services import news
-from app.services.llm import LLMError, complete_json
+from app.services.llm import complete_json
 
 QUESTION_MODEL = "model_2"
-EVALUATION_MODEL = "model_3"
 MAX_FOLLOWUPS = 2
-SCORE_KEYS = ["relevance", "accuracy", "depth", "balance", "practicality", "clarity"]
 
 
 class InterviewError(ValueError):
@@ -36,17 +36,41 @@ def _obj(props: dict) -> dict:
 QUESTION_SCHEMA = _obj({
     "question": {"type": "string"},
     "angle": {"type": "string", "enum": ["news", "daf", "topic"]},
+    "daf_item": {"type": ["string", "null"]},
     "based_on": {"type": "string"},
     "article_url": {"type": ["string", "null"]},
 })
-EVALUATION_SCHEMA = _obj({
-    "scores": _obj({k: {"type": "integer"} for k in SCORE_KEYS}),
-    "verdict": {"type": "string", "enum": ["good", "partial", "weak"]},
-    "critique": {"type": "string"},
-    "missing_points": {"type": "array", "items": {"type": "string"}},
-    "model_answer_points": {"type": "array", "items": {"type": "string"}},
-    "follow_up_question": {"type": ["string", "null"]},
-})
+
+# The angle each generated question takes, chosen in code and rotated so one angle can't dominate.
+ANGLES = {
+    "daf_link": "Connect ONE DAF item that has not been covered yet to {topic}: ask about the topic through the lens of "
+                "the candidate's hometown or state, degree, job or optional subject.",
+    "news_daf": "Pick ONE recent news item on {topic} and ask about it in a way that draws on the candidate's "
+                "background (their state, field of study or work).",
+    "topic": "Ask a straight question on {topic}, the kind any candidate could get. Do not use the DAF this time.",
+    "news": "Build the question on ONE recent news item about {topic}.",
+    "daf_depth": "Test genuine depth on ONE DAF item not covered yet: the basics of their degree, the real challenges "
+                 "of their job, or real understanding of a listed hobby (what it involves, why it matters, what it "
+                 "taught them). Test understanding, not memorised trivia; asking for one widely known fact is fine.",
+    "daf_admin": "Take ONE DAF item not covered yet and ask how it would matter in their work as an officer, or what "
+                 "they would do about a real issue in their home district or state.",
+}
+
+
+def daf_items(daf: str) -> list[str]:
+    return [i.strip(" .") for i in re.split(r"[;,\n|]+", daf) if len(i.strip(" .")) > 1]
+
+
+def _angle(topic: prompts.Topic, daf: str | None, has_articles: bool, turns: list[dict]) -> str:
+    """Rotate through the angles available for this topic, by how many questions it has had so far."""
+    if topic.needs_daf:
+        options = ["daf_depth", "daf_admin"]
+    elif daf:
+        options = ["daf_link", "news_daf", "topic"] if has_articles else ["daf_link", "topic"]
+    else:
+        options = ["news", "topic"] if has_articles else ["topic"]
+    asked_on_topic = sum(1 for t in turns if t["topic"] == topic.name and t["depth"] == 0)
+    return options[asked_on_topic % len(options)]
 
 
 # ---------- sessions and turns ----------
@@ -114,22 +138,49 @@ def _queries(topic: prompts.Topic, daf: str | None, articles: list[dict]) -> lis
     return queries
 
 
+def _articles_listing(articles: list[dict]) -> str:
+    return "\n".join(f"- [{a['published_at']:%d %b}] {a['title']} ({a['source']})\n  {a['summary'][:400]}\n  url: {a['url']}"
+                     for a in articles) or "(none for this question)"
+
+
 def _generated_question(topic: prompts.Topic, board: str | None, daf: str | None,
                         turns: list[dict]) -> tuple[str, dict]:
-    """A new question written by model_2 from the topic, DAF, news and similar real questions."""
+    """A new question written by model_2. With a DAF, the DAF prompt; otherwise the general one."""
     used_urls = [t["source"].get("url") for t in turns if t["source"].get("url")]
     articles = news.recent([topic.name], limit=6, exclude_urls=used_urls) if topic.news else []
-    examples = bank.similar(_queries(topic, daf, articles), n=15, board=board, exclude_ids=_used_question_ids(turns))
-    candidates = bank.similar_candidates(daf) if daf else []
-    listing = "\n".join(f"- [{a['published_at']:%d %b}] {a['title']} ({a['source']})\n  {a['summary'][:400]}\n  url: {a['url']}"
-                        for a in articles) or "(not used for this topic)"
-    prompt = prompts.render(
-        "question", topic=topic.name, guidance=topic.guidance, daf=daf or "(not provided)", persona=_persona(board),
-        past_questions=bank.fmt(examples), similar_candidates=bank.fmt_candidates(candidates),
-        articles=listing, asked=_asked(turns))
+    angle = _angle(topic, daf, bool(articles), turns)
+    if not angle.startswith("news"):
+        articles = []   # keep the model on the chosen angle
+    instruction = ANGLES[angle].format(topic=topic.name)
+    exclude = _used_question_ids(turns)
+    topic_examples = bank.similar([f"{topic.name}. {topic.testing}"] + [a["title"] for a in articles[:3]],
+                                  n=10 if daf else 15, board=board, exclude_ids=exclude)
+
+    if daf:
+        items = daf_items(daf)
+        covered = [t["source"]["daf_item"] for t in turns if t["source"].get("daf_item")]
+        daf_examples = bank.similar([i for i in items if i not in covered][:6] or items[:6], n=12, exclude_ids=exclude)
+        profile = bank.profile_tags(daf)
+        prompt = prompts.render(
+            "question_daf", topic=topic.name, angle_instruction=instruction, guidance=topic.guidance,
+            daf="\n".join(f"- {i}" for i in items),
+            profile="; ".join(f"{k.replace('_tag', '')}: {', '.join(v) if isinstance(v, list) else v}"
+                              for k, v in profile.items() if v) or "(not recognised)",
+            covered=", ".join(covered) or "none yet",
+            daf_questions=bank.fmt(daf_examples), past_questions=bank.fmt(topic_examples),
+            similar_candidates=bank.fmt_candidates(bank.similar_candidates(daf)),
+            articles=_articles_listing(articles), persona=_persona(board), asked=_asked(turns))
+        examples = topic_examples + daf_examples
+    else:
+        prompt = prompts.render(
+            "question", topic=topic.name, angle_instruction=instruction, guidance=topic.guidance,
+            past_questions=bank.fmt(topic_examples), articles=_articles_listing(articles),
+            persona=_persona(board), asked=_asked(turns))
+        examples = topic_examples
+
     out = complete_json(QUESTION_MODEL, [{"role": "user", "content": prompt}], QUESTION_SCHEMA, "question")
-    src = {"type": "generated", "angle": out["angle"], "based_on": out["based_on"],
-           "examples": [e["id"] for e in examples]}
+    src = {"type": "generated", "angle": out["angle"], "target_angle": angle, "based_on": out["based_on"],
+           "daf_item": out.get("daf_item"), "examples": [e["id"] for e in examples]}
     article = next((a for a in articles if a["url"] == out.get("article_url")), None)
     if article:
         src |= {"url": article["url"], "title": article["title"], "summary": article["summary"][:600],
@@ -139,11 +190,11 @@ def _generated_question(topic: prompts.Topic, board: str | None, daf: str | None
 
 def _real_question(topic: prompts.Topic, board: str | None, daf: str | None, turns: list[dict]) -> tuple[str, dict]:
     """A real past question, chosen by meaning (topic, plus DAF when given); no LLM call."""
-    closest = bank.similar(_queries(topic, daf, []), n=25, board=board, exclude_ids=_used_question_ids(turns))
+    closest = bank.similar(_queries(topic, daf, []), n=25, board=board, exclude_ids=_used_question_ids(turns), askable=True)
     if not closest:
         raise InterviewError(f"No past questions found for {topic.name}")
     q = random.choice(closest[:12])   # some variety among the closest matches
-    return q["text"], {"type": "past", "question_id": q["id"], "transcript_id": q["transcript_id"],
+    return bank.readable(q["text"]), {"type": "past", "question_id": q["id"], "transcript_id": q["transcript_id"],
                        "board": q["board"], "cse_year": q["cse_year"], "member": q["member"]}
 
 
@@ -178,22 +229,25 @@ def _skip_turn(turn_id: int) -> None:
 
 # ---------- answering ----------
 
-def _context(turn: dict) -> str:
-    src = turn["source"]
-    if src["type"] == "current":
-        return (f"The question was based on this recent news item ({src.get('publisher')}, {src.get('published_at', '')[:10]}): "
-                f"{src.get('title')}. {src.get('summary', '')}")
+def _context(src: dict) -> str:
+    """Where the question came from, in a sentence."""
     if src["type"] == "past":
         return f"This is a real question asked in a past interview (CSE {src.get('cse_year')}, {src.get('board')} board)."
     if src["type"] == "generated":
-        base = f"The board wrote this question for the candidate; it builds on: {src.get('based_on')}."
-        if src.get("title"):
-            base += (f" It draws on this recent news item ({src.get('publisher')}, {src.get('published_at', '')[:10]}): "
-                     f"{src.get('title')}. {src.get('summary', '')}")
-        return base
+        return f"The board wrote this question for the candidate; it builds on: {src.get('based_on')}."
+    if src["type"] == "current":
+        return "The question was based on a recent news item (see Reference facts)."
     if src["type"] == "daf":
         return f"This question is about the candidate's DAF item: {src.get('daf_item')}."
     return "This is a follow-up question."
+
+
+def _reference(chain: list[dict]) -> str:
+    """Facts the evaluator may rely on: the news item behind the main question, if any."""
+    src = chain[0]["source"]
+    if src.get("title"):
+        return f"- News item ({src.get('publisher')}, {src.get('published_at', '')[:10]}): {src['title']}. {src.get('summary', '')}"
+    return ""
 
 
 def answer(session_id: UUID, text: str, mode: str, topics: list[str], board: str | None, daf: str | None,
@@ -209,35 +263,16 @@ def answer(session_id: UUID, text: str, mode: str, topics: list[str], board: str
         f"Board{' (follow-up)' if t['depth'] else ''}: {t['question']}\nCandidate: {t['answer'] if t['id'] != pending['id'] else text}"
         for t in chain if t["answer"] or t["id"] == pending["id"])
     followups_left = MAX_FOLLOWUPS - pending["depth"]
-    topic = prompts.topic(pending["topic"])
     pairs = [(r["text"], r["follow_up"]) for r in bank.similar([pending["question"]], n=12) if r["follow_up"]][:5]
-    instruction = (
-        f"If (and only if) the verdict is good, write one follow-up question in `follow_up_question` that probes "
-        f"deeper into the candidate's answer: challenge a claim they made, ask for a specific example, or push back "
-        f"with a counter-view. One short question, no preamble. Otherwise set it to null. "
-        f"(Follow-ups left for this question: {followups_left}.)"
-        if followups_left > 0 else "No more follow-ups for this question: set `follow_up_question` to null.")
-    prompt = prompts.render(
-        "evaluate", topic=topic.name, guidance=topic.guidance, today=date.today().strftime("%d %B %Y"),
-        context=_context(pending), exchange=exchange,
-        followup_examples="\n".join(f"- Q: {q}\n  Follow-up: {f}" for q, f in pairs) or "- (none found)",
-        followup_instruction=instruction)
-    evaluation = complete_json(EVALUATION_MODEL, [{"role": "user", "content": prompt}], EVALUATION_SCHEMA, "evaluation")
-
-    # Enforce the rubric in code: "good" needs every score >= 3 and an average >= 3.5.
-    scores = {k: max(1, min(5, int(evaluation["scores"].get(k, 1)))) for k in SCORE_KEYS}
-    evaluation["scores"] = scores
-    evaluation["average"] = round(sum(scores.values()) / len(scores), 2)
-    if evaluation["verdict"] == "good" and (min(scores.values()) < 3 or evaluation["average"] < 3.5):
-        evaluation["verdict"] = "partial"
-    follow_up = evaluation.pop("follow_up_question", None)
+    evaluation, follow_up = evaluator.evaluate(
+        pending["topic"], _context(pending["source"]), _reference(chain), exchange, text, followups_left, pairs)
 
     with pool.connection() as conn:
         conn.execute("UPDATE interview_turns SET answer = %s, evaluation = %s, mode = %s WHERE id = %s",
                      (text, Jsonb(evaluation), mode, pending["id"]))
         if evaluation["verdict"] == "good" and followups_left > 0 and follow_up:
             nxt = _add_turn(conn, session_id, pending["main_index"], pending["depth"] + 1, pending["topic"],
-                            follow_up.strip(), {"type": "followup"})
+                            follow_up, {"type": "followup"})
             conn.commit()
             return {"evaluation": evaluation, "next": nxt}
         conn.commit()
@@ -255,7 +290,9 @@ def report(session_id: UUID) -> dict:
         by_topic.setdefault(t["topic"], []).append(t)
 
     def avg(ts: list[dict], key: str | None = None) -> float:
-        vals = [t["evaluation"]["average"] if key is None else t["evaluation"]["scores"][key] for t in ts]
+        # older evaluations may lack newer dimensions (e.g. tone): average over those that have it
+        vals = [t["evaluation"]["average"] if key is None else t["evaluation"]["scores"].get(key) for t in ts]
+        vals = [v for v in vals if v is not None]
         return round(sum(vals) / len(vals), 2) if vals else 0.0
 
     return {

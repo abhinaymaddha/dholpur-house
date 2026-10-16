@@ -1,0 +1,7 @@
+[
+  {"id": "daf_ir", "topics": ["International Relations"], "board": null, "count": 3,
+   "daf": "Kota, Rajasthan; B.Tech Civil Engineering, IIT Roorkee; worked 2 years at L&T on metro projects; PSIR optional; chess, cycling"},
+  {"id": "daf_only", "topics": ["DAF & Background"], "board": "Lt Gen Raj Shukla", "count": 2,
+   "daf": "Kota, Rajasthan; B.Tech Civil Engineering, IIT Roorkee; worked 2 years at L&T on metro projects; PSIR optional; chess, cycling"},
+  {"id": "no_daf_economy", "topics": ["Economy"], "board": null, "count": 2, "daf": null}
+]

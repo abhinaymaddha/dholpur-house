@@ -6,18 +6,29 @@ Used three ways: as examples that ground generated questions, as questions asked
 
 from __future__ import annotations
 
+import re
+
 import numpy as np
 
 from app.database import pool
-from app.ingest.tags import profile_tags
+from app.ingest.tags import profile_tags  # noqa: F401  (re-exported for the engine)
 from app.services.embeddings import embed
+
+# A line a board member could read out as-is (used when real questions are asked directly), not narration
+# such as "Some questions about books" or "Discussion on federalism".
+ASKABLE = (r"q.text ~* '(\?\s*$|^\s*(what|why|how|who|whom|when|where|which|is|are|was|were|do|does|did|can|could|"
+           r"should|would|will|have|has|tell|explain|describe|give|name|define|suggest|suppose|if|as a|as the|you|your)\M)'"
+           r" AND q.text !~* '^\s*(some|few|many|asked|discussion|discussed|questions?|talked|long|then|also|rest|"
+           r"any|and|so|but|does it|is it|was it|why so|how so|what about it)\M'"
+           # stand-alone: at least five words, so it isn't a fragment that only makes sense after another question
+           r" AND array_length(regexp_split_to_array(trim(q.text), '\s+'), 1) >= 5")
 
 _COLS = ("q.id, q.text, q.member, q.transcript_id, t.board, t.cse_year, t.alias, t.daf, "
          "(SELECT f.text FROM questions f WHERE f.prev_id = q.id LIMIT 1) AS follow_up")
 
 
 def similar(queries: list[str], n: int = 12, board: str | None = None, exclude_ids: list[int] = (),
-            exclude_transcript: str | None = None, prefer_board: bool = True) -> list[dict]:
+            exclude_transcript: str | None = None, prefer_board: bool = True, askable: bool = False) -> list[dict]:
     """Past questions closest in meaning to any of the query texts, best first, de-duplicated.
 
     With a board, half the results come from that board (if it has enough) so its style shows through.
@@ -33,6 +44,8 @@ def similar(queries: list[str], n: int = 12, board: str | None = None, exclude_i
                    "NOT (q.id = ANY(%(exclude)s::bigint[]))"]
         if exclude_transcript:
             clauses.append("q.transcript_id <> %(tx)s")
+        if askable:
+            clauses.append(ASKABLE)
         if board_only:
             clauses.append("t.board = %(board)s")
         params = {"v": vec, "limit": limit, "exclude": list(exclude_ids), "tx": exclude_transcript, "board": board}
@@ -82,6 +95,14 @@ def similar_candidates(daf: str, n: int = 2) -> list[dict]:
                               (t["id"],)).fetchall()
             result.append({**t, "questions": qs})
     return result
+
+
+_STAGE_DIRECTION = re.compile(r"^\s*\([^)]{0,60}\)\s*")
+
+
+def readable(text: str) -> str:
+    """A past question as it can be read out: without a leading '(Then shifted to Polity)' note."""
+    return _STAGE_DIRECTION.sub("", text).strip()
 
 
 def board_examples(board: str, n: int = 8) -> list[dict]:
