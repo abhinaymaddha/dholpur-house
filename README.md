@@ -1,5 +1,7 @@
 # Dholpur House
 
+[![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-9c3d2e.svg)](LICENSE) [![CI](https://github.com/abhinaymaddha/dholpur-house/actions/workflows/ci.yml/badge.svg)](https://github.com/abhinaymaddha/dholpur-house/actions/workflows/ci.yml)
+
 Prepare for the UPSC Civil Services **Personality Test** (the interview, held at Dholpur House, New Delhi) with the real transcripts past candidates shared on Telegram: search them, ask questions about them, and practise with an AI interview board that asks, listens and critiques.
 
 - **Browse**: keyword search across every transcript, combined with drill-down by exam year → board and tags (background, optional, home state, interests, topics asked); highlighted matches and a formatted reader.
