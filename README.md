@@ -10,7 +10,7 @@ Prepare for the UPSC Civil Services **Personality Test** (the interview, held at
 
 > Transcripts are candidates' own recollections. Answers are generated from them and can be wrong, so always check the cited sources.
 >
-> Dholpur House is an independent, non-commercial project, not affiliated with the UPSC, the Government of India, the source Telegram channel or Telegram. See the [Disclaimer](DISCLAIMER.md). Want to help? See [CONTRIBUTING.md](CONTRIBUTING.md).
+> Dholpur House is an independent, non-commercial project, not affiliated with the UPSC, the Government of India, the source Telegram channel or Telegram. See the [Disclaimer](DISCLAIMER.md). Want to help? See [CONTRIBUTING.md](CONTRIBUTING.md). Found a security issue? See [SECURITY.md](SECURITY.md).
 
 ## Data credit
 
