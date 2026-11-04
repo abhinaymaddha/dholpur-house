@@ -54,20 +54,20 @@ api_key = "ollama"
 
 [models.model_1]
 provider = "openrouter"
-id = "nvidia/nemotron-3-super-120b-a12b:free"
-max_tokens = 4000
+id = "nvidia/nemotron-3.5-super-vl:free"
+max_tokens = 8000
 reasoning_effort = "low"
 
 [models.model_2]
 provider = "openrouter"
-id = "nvidia/nemotron-3-super-120b-a12b:free"
-max_tokens = 3000
+id = "nvidia/nemotron-3.5-super-vl:free"
+max_tokens = 8000
 reasoning_effort = "low"
 
 [models.model_3]
 provider = "openrouter"
-id = "nvidia/nemotron-3-super-120b-a12b:free"
-max_tokens = 4000
+id = "nvidia/nemotron-3.5-super-vl:free"
+max_tokens = 12000
 reasoning_effort = "medium"
 
 # Examples (replace a slot's settings with one of these):

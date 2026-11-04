@@ -70,8 +70,21 @@ class OpenAICompatibleProvider(LLMProvider):
         except requests.RequestException as e:
             raise ProviderError(f"Could not reach {self.name}: {e}") from e
         if r.status_code != 200:
-            raise ProviderError(f"{self.name} returned {r.status_code}: {r.text[:300]}")
+            raise ProviderError(f"{self.name} returned {r.status_code}: {self.error_message(r.text)}")
         return r
+
+    @staticmethod
+    def error_message(body: str) -> str:
+        """The readable part of an error body. Providers also send account details (e.g. OpenRouter's user_id),
+        which must not reach the page."""
+        try:
+            err = json.loads(body).get("error")
+            message = err.get("message") if isinstance(err, dict) else err
+            if isinstance(message, str) and message:
+                return message[:300]
+        except (ValueError, AttributeError):
+            pass
+        return body[:300]
 
     @staticmethod
     def parse_json(text: str | None) -> dict:
