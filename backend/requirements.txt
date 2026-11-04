@@ -4,7 +4,7 @@ uvicorn[standard]==0.54.*
 pydantic-settings==2.*
 psycopg[binary]==3.2.*
 psycopg-pool==3.2.*
-pgvector==0.4.*
+pgvector==0.5.*
 fastembed==0.9.*
 pillow>=13.0.0             # security floor for fastembed's image dependency (not used by this app)
 requests==2.*
