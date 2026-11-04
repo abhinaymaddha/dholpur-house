@@ -162,3 +162,33 @@ def test_admin_news_refresh(client, admin, monkeypatch):
             return {"forced": force}
     client.app.dependency_overrides[get_news] = lambda: Stub()
     assert client.post("/api/admin/news/refresh", headers=admin).json() == {"forced": True}
+
+
+def test_ai_endpoints_are_rate_limited_per_visitor(client, fake_llm):
+    from app.dependencies import get_rate_limiter
+    from app.services.rate_limit import RateLimiter
+    limiter = RateLimiter(per_minute=2, per_day=100, daily_budget=100)
+    client.app.dependency_overrides[get_rate_limiter] = lambda: limiter
+    me = {"X-Real-IP": "203.0.113.7"}
+    body = {"filters": {"topics": ["Health"], "question_mode": "real"}}
+    assert client.post("/api/interview/next", json=body, headers=me).status_code == 200
+    assert client.post("/api/ask", json={"question": "anything"}, headers=me).status_code == 200
+    r = client.post("/api/interview/next", json=body, headers=me)
+    assert r.status_code == 429 and "a bit fast" in r.json()["detail"]
+    r = client.post("/api/ask", json={"question": "anything"}, headers=me)
+    assert r.status_code == 429 and r.headers["content-type"].startswith("application/json")
+    fake_llm.json["evaluation"] = lambda m: {
+        "scores": {k: 3 for k in evaluator.SCORE_KEYS}, "verdict": "partial", "issues": [], "strengths": [],
+        "critique": "", "missing_points": [], "model_answer_points": [], "follow_up_question": None}
+    sid = client.post("/api/interview/next", json=body, headers={"X-Real-IP": "198.51.100.1"}).json()["session_id"]
+    r = client.post("/api/interview/answer", json={"session_id": sid, "answer": "x", "filters": body["filters"]},
+                    headers={"X-Real-IP": "198.51.100.1"})
+    assert r.status_code == 200                       # a different visitor still has allowance
+    assert set(limiter._daily) == {"203.0.113.7", "198.51.100.1"}
+
+
+def test_client_ip_falls_back_to_the_connection():
+    from types import SimpleNamespace
+    from app.dependencies import client_ip
+    assert client_ip(SimpleNamespace(headers={}, client=SimpleNamespace(host="10.1.2.3"))) == "10.1.2.3"
+    assert client_ip(SimpleNamespace(headers={}, client=None)) == "unknown"

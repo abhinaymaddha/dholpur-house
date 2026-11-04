@@ -96,6 +96,12 @@ describe('ask (server-sent events)', () => {
     h = handlers()
     await api.ask('Q?', emptyFilters(), '', h, new AbortController().signal)
     expect(h.onError).toHaveBeenCalledWith('Request failed (500)')
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ detail: 'Please wait a minute' }),
+      { status: 429, headers: { 'Content-Type': 'application/json' } })))
+    h = handlers()
+    await api.ask('Q?', emptyFilters(), '', h, new AbortController().signal)
+    expect(h.onError).toHaveBeenCalledWith('Please wait a minute')
   })
 
   it('finishes when the stream ends without a done event', async () => {

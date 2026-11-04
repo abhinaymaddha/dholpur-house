@@ -6,14 +6,15 @@ Events: `sources` (JSON list, sent first), `delta` (answer text, many), `error`,
 import json
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse
 
-from app.dependencies import get_retriever
+from app.dependencies import client_ip, get_rate_limiter, get_retriever
 from app.errors import AppError
 from app.schemas.ask import AskRequest
 from app.services.answer import stream_answer
+from app.services.rate_limit import RateLimiter
 from app.services.retrieval import HybridRetriever
 
 router = APIRouter(prefix="/api", tags=["ask"])
@@ -25,7 +26,9 @@ def _sse(event: str, data) -> str:
 
 
 @router.post("/ask")
-def ask(req: AskRequest, retriever: HybridRetriever = Depends(get_retriever)):
+def ask(req: AskRequest, request: Request, retriever: HybridRetriever = Depends(get_retriever),
+        limiter: RateLimiter = Depends(get_rate_limiter)):
+    limiter.check(client_ip(request))   # before the stream starts, so a refusal is a plain 429
     def events():
         sources = retriever.retrieve(req.question, req.filters, top_k=req.top_k, q=req.q)
         yield _sse("sources", sources)

@@ -52,6 +52,12 @@ class Settings(BaseSettings):
     # Load backend/seed/ automatically when the database has no transcripts
     seed_on_empty: bool = Field(default=True, alias="SEED_ON_EMPTY")
 
+    # Limits on Ask AI and Interview requests (see app/services/rate_limit.py). The daily budget caps calls that
+    # reach the LLM site-wide; keep it under your provider's daily limit (OpenRouter free models: 50 or 1,000).
+    rate_per_minute: int = Field(default=10, alias="RATE_PER_MINUTE")
+    rate_per_day: int = Field(default=150, alias="RATE_PER_DAY")
+    ai_daily_budget: int = Field(default=900, alias="AI_DAILY_BUDGET")
+
     # Enables /api/admin (upload a Telegram export to re-ingest). Leave empty to disable.
     admin_token: str = Field(default="", alias="ADMIN_TOKEN")
 

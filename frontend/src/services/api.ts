@@ -62,7 +62,9 @@ export async function ask(question: string, filters: Filters, q: string, handler
     signal,
   })
   if (!res.ok || !res.body) {
-    handlers.onError(`Request failed (${res.status})`)
+    // The server explains refusals (e.g. a rate limit) as {"detail": "..."}
+    const detail = await res.json().then((b) => (typeof b?.detail === 'string' ? b.detail : null), () => null)
+    handlers.onError(detail ?? `Request failed (${res.status})`)
     return
   }
   const reader = res.body.pipeThrough(new TextDecoderStream()).getReader()

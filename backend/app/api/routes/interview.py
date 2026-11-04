@@ -2,9 +2,11 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
-from app.dependencies import get_bank, get_interviews, get_news, get_question_sources
+from app.dependencies import (
+    client_ip, get_bank, get_interviews, get_news, get_question_sources, get_rate_limiter,
+)
 from app.interview import prompts
 from app.interview.bank import QuestionBank
 from app.interview.questions import QuestionSource
@@ -14,6 +16,7 @@ from app.schemas.interview import (
     AnswerRequest, AnswerResponse, InterviewFilters, NextRequest, NextResponse, SimilarQuestion, TopicInfo, Turn,
 )
 from app.services.news import NewsService
+from app.services.rate_limit import RateLimiter
 
 router = APIRouter(prefix="/api/interview", tags=["interview"])
 
@@ -42,15 +45,19 @@ def list_topics(bank: QuestionBank = Depends(get_bank), news: NewsService = Depe
 
 
 @router.post("/next", response_model=NextResponse)
-def next_question(req: NextRequest, sessions: SessionFactory = Depends()):
+def next_question(req: NextRequest, request: Request, sessions: SessionFactory = Depends(),
+                  limiter: RateLimiter = Depends(get_rate_limiter)):
     """Ask the next main question using the current filters (starts a conversation if needed)."""
+    limiter.check(client_ip(request), uses_ai=req.filters.question_mode != "real")
     session = sessions.open(req.session_id)
     return {"session_id": session.id, "turn": session.next_question(_filters(req.filters))}
 
 
 @router.post("/answer", response_model=AnswerResponse)
-def answer(req: AnswerRequest, sessions: SessionFactory = Depends()):
+def answer(req: AnswerRequest, request: Request, sessions: SessionFactory = Depends(),
+           limiter: RateLimiter = Depends(get_rate_limiter)):
     """Evaluate the answer to the open question; returns the evaluation and the next question (follow-up or new)."""
+    limiter.check(client_ip(request))
     return sessions.open(req.session_id).answer(req.answer, req.mode, _filters(req.filters))
 
 

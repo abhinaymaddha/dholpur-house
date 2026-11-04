@@ -29,3 +29,9 @@ class IngestRunning(AppError):
     """An ingest was requested while another one is still running."""
 
     status_code = 409
+
+
+class RateLimited(AppError):
+    """A visitor, or the whole site, has used up its allowance of AI-backed requests for now."""
+
+    status_code = 429

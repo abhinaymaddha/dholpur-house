@@ -80,3 +80,19 @@ def test_contact_details_are_redacted():
     out = redact("Thank you!\nA. Researcher\nresearcher@example.ac.in\n+91 9000012345\nCall 98765 43210. Rank 873, marks 195.")
     assert "example.ac.in" not in out and "9000012345" not in out and "98765 43210" not in out
     assert out.count("[email removed]") == 1 and out.count("[phone removed]") == 2 and "873" in out and "195" in out
+
+
+def test_personal_identifiers_are_redacted_but_credit_kept():
+    from app.ingest.pipeline import redact
+    out = redact("Please forward transcripts to @Example_admin1 @another_one\n"
+                 "Name- Test Candidate / AIR 785 / Roll no- 7654321 / Channel link - https://t.me/somecandidate\n"
+                 "Roll No. 1234567 | notes https://someone.github.io/notes | invite t.me/+AbCdEf123\n"
+                 "Join @csetranscripts: https://t.me/csetranscripts/42 | https://upsc.gov.in/results | roll of 2005")
+    for gone in ("@Example_admin1", "@another_one", "7654321", "1234567", "t.me/somecandidate", "github.io", "AbCdEf123"):
+        assert gone not in out
+    assert out.count("[Telegram username removed]") == 2 and out.count("[Telegram link removed]") == 2
+    assert "Roll no- [removed]" in out and "[personal link removed]" in out
+    # the credit stays: names, ranks, the source channel and official links
+    for kept in ("Test Candidate", "AIR 785", "@csetranscripts", "https://t.me/csetranscripts/42",
+                 "https://upsc.gov.in/results", "roll of 2005"):
+        assert kept in out

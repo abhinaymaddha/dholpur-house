@@ -29,13 +29,26 @@ from .transcripts import chunks, classify, metadata
 
 SEED_FILE = Path(__file__).resolve().parents[2] / "seed" / "csetranscripts_messages.jsonl"
 
-# Personal contact details that sometimes appear in posts; never stored or shown.
+# Personal details that sometimes appear in posts; never stored or shown. Names, aliases and ranks stay, so
+# candidates keep the credit for what they shared, and the source channel stays linked; only the means to
+# identify or contact a person go: emails, phone numbers, roll numbers, Telegram usernames and links to
+# personal Telegram channels or websites.
+SOURCE_CHANNEL = "csetranscripts"
 _EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 _PHONE = re.compile(r"(?<!\d)(?:\+?91[\s-]?)?[6-9]\d{4}[\s-]?\d{5}(?!\d)")
+_ROLL = re.compile(r"(?i)(roll\s*(?:no|number|num)?\.?\s*[:\-–.]*\s*)\d{6,8}(?!\d)")
+_TELEGRAM_LINK = re.compile(rf"(?i)(?:https?://)?(?:www\.)?(?:t|telegram)\.me/(?!{SOURCE_CHANNEL}\b)[^\s)\]>]+")
+_TELEGRAM_HANDLE = re.compile(rf"(?<![\w.@/])@(?!{SOURCE_CHANNEL}\b)[A-Za-z][A-Za-z0-9_]{{4,31}}\b")
+_PERSONAL_SITE = re.compile(r"(?i)(?:https?://)?[\w-]+\.github\.io\S*")
 
 
 def redact(text: str) -> str:
-    return _PHONE.sub("[phone removed]", _EMAIL.sub("[email removed]", text))
+    text = _EMAIL.sub("[email removed]", text)          # before handles: an email contains an @
+    text = _TELEGRAM_LINK.sub("[Telegram link removed]", text)
+    text = _PERSONAL_SITE.sub("[personal link removed]", text)
+    text = _TELEGRAM_HANDLE.sub("[Telegram username removed]", text)
+    text = _ROLL.sub(r"\1[removed]", text)
+    return _PHONE.sub("[phone removed]", text)
 
 
 def load_messages(source: Path) -> list[dict]:
