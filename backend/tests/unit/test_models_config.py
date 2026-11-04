@@ -83,7 +83,7 @@ def test_api_key_resolution(monkeypatch):
     monkeypatch.setenv("TEST_KEY_VAR", "from-env")
     assert ProviderConfig(name="p", kind="openai", api_key_env="TEST_KEY_VAR").key() == "from-env"
     monkeypatch.delenv("TEST_KEY_VAR")
-    with pytest.raises(ConfigError, match="set TEST_KEY_VAR in backend/.env"):
+    with pytest.raises(ConfigError, match="set the TEST_KEY_VAR environment variable"):
         ProviderConfig(name="p", kind="openai", api_key_env="TEST_KEY_VAR").key()
     assert "inline" not in repr(ProviderConfig(name="p", kind="openai", api_key="inline"))
 

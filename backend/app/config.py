@@ -15,6 +15,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=False)
 
 
+# Not a setting: hosts such as Dokploy put their own APP_NAME in the environment.
+APP_NAME = "Dholpur House"
+
+
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
@@ -26,7 +30,6 @@ class Settings(BaseSettings):
     )
 
     # Application
-    app_name: str = Field(default="Dholpur House", alias="APP_NAME")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     cors_origins: str = Field(default="http://localhost:5173", alias="CORS_ORIGINS")
 

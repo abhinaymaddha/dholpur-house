@@ -45,3 +45,10 @@ def test_empty_database_is_seeded(monkeypatch):
 def test_loaded_database_warms_the_embedder(monkeypatch):
     started, threads, refreshed = run_lifespan(monkeypatch, empty=False, seed_exists=True)
     assert not started.calls and len(threads.calls) == 1 and refreshed
+
+
+def test_app_name_ignores_the_hosts_app_name(monkeypatch):
+    # Dokploy sets APP_NAME to its internal service id; the title must not change.
+    monkeypatch.setenv("APP_NAME", "dholpurhouse-lgxa3i")
+    from app.config import Settings
+    assert not hasattr(Settings(), "app_name") and main.app.title == "Dholpur House"

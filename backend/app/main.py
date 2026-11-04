@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.routes import admin_router, ask_router, health_router, interview_router, transcripts_router
-from app.config import settings
+from app.config import APP_NAME, settings
 from app.database import pool
 from app.dependencies import get_news
 from app.errors import AppError, ProviderError
@@ -42,12 +42,12 @@ async def lifespan(app: FastAPI):
         # Load the embedding model in the background so the first /api/ask isn't slow.
         threading.Thread(target=embed_one, args=("warm up",), daemon=True).start()
     get_news().refresh_in_background()   # current-affairs feeds for Interview mode
-    logger.info("Started %s (models: %s)", settings.app_name, {k: m.id for k, m in all_models().items()})
+    logger.info("Started %s (models: %s)", APP_NAME, {k: m.id for k, m in all_models().items()})
     yield
     pool.close()
 
 
-app = FastAPI(title=settings.app_name, lifespan=lifespan)
+app = FastAPI(title=APP_NAME, lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
