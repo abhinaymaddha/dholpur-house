@@ -2,7 +2,7 @@ fastapi==0.162.*
 starlette>=1.3.1          # security floor (FastAPI allows older, vulnerable versions)
 uvicorn[standard]==0.54.*
 pydantic-settings==2.*
-psycopg[binary]==3.2.*
+psycopg[binary]==3.3.*
 psycopg-pool==3.2.*
 pgvector==0.4.*
 fastembed==0.9.*
