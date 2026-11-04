@@ -86,6 +86,10 @@ embedded) and downloads the embedding model (~220 MB) into a volume.
    POSTGRES_PASSWORD=<long random string>
    OPENROUTER_API_KEY=<key>                # or OPENAI_API_KEY / ANTHROPIC_API_KEY, matching models.toml
    ADMIN_TOKEN=<long random string>        # optional, enables /api/admin/ingest
+   # optional limits on Ask AI and Interview (defaults shown); keep the budget under your provider's daily limit
+   RATE_PER_MINUTE=10                      # per visitor
+   RATE_PER_DAY=150                        # per visitor
+   AI_DAILY_BUDGET=900                     # model calls per day, whole site
    ```
 3. Domains: service `frontend`, port `80`, HTTPS on.
 4. Deploy. The database seeds itself on first start; the UI shows a notice until it's ready.

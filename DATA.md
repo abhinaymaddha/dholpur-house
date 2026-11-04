@@ -14,7 +14,10 @@ no ownership of it.
 
 - `backend/seed/csetranscripts_messages.jsonl`: the text of the channel's messages (no media),
   one JSON object per message, as exported with Telegram Desktop.
-- Email addresses and phone numbers are removed automatically, here and in every ingest.
+- Personal details are removed automatically, here and in every ingest: email addresses, phone numbers,
+  roll numbers, Telegram usernames, and links to personal Telegram channels or websites. Names, aliases
+  and ranks that candidates chose to share are kept, so they keep the credit for their transcripts, and
+  the source channel stays linked throughout.
 - The transcripts are **not** covered by this repository's license (CC BY-NC 4.0 applies to the
   code and documentation only). They remain the work of their authors.
 
