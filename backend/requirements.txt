@@ -3,7 +3,7 @@ starlette>=1.3.1          # security floor (FastAPI allows older, vulnerable ver
 uvicorn[standard]==0.54.*
 pydantic-settings==2.*
 psycopg[binary]==3.2.*
-psycopg-pool==3.2.*
+psycopg-pool==3.3.*
 pgvector==0.4.*
 fastembed==0.9.*
 pillow>=13.0.0             # security floor for fastembed's image dependency (not used by this app)
