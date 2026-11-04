@@ -28,6 +28,11 @@ services:
       DATABASE_URL: postgresql://upsc:${POSTGRES_PASSWORD:-upsc}@db:5432/upsc
     volumes:
       - models:/models
+    networks:
+      default:
+        # A name unique to this app: the frontend also joins shared networks (Dokploy's), where a plain
+        # "backend" could resolve to another app's service.
+        aliases: [dholpurhouse-backend]
     depends_on:
       db:
         condition: service_healthy
