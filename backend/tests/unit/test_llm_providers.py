@@ -115,6 +115,10 @@ def test_complete_json_tolerates_code_fences(post):
     (ok('{"a": 1}', finish="length"), "stopped early"),
     (FakeResponse(payload={"error": {"message": "quota"}}), "quota"),
     (FakeResponse(status=429, text="slow down"), "returned 429: slow down"),
+    (FakeResponse(status=404, text='{"error": {"message": "Model gone", "code": 404}, "user_id": "user_secret"}'),
+     "returned 404: Model gone$"),
+    (FakeResponse(status=400, text='{"error": "bad request"}'), "returned 400: bad request$"),
+    (FakeResponse(status=500, text='{"detail": "x"}'), r'returned 500: \{"detail": "x"\}$'),
     (requests.ConnectionError("dns"), "Could not reach"),
 ])
 def test_complete_json_errors(post, response, message):
