@@ -2,237 +2,149 @@
 
 [![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-9c3d2e.svg)](LICENSE) [![CI](https://github.com/abhinaymaddha/dholpur-house/actions/workflows/ci.yml/badge.svg)](https://github.com/abhinaymaddha/dholpur-house/actions/workflows/ci.yml)
 
-Prepare for the UPSC Civil Services **Personality Test** (the interview, held at Dholpur House, New Delhi) with the real transcripts past candidates shared on Telegram: search them, ask questions about them, and practise with an AI interview board that asks, listens and critiques.
+**Prepare for the UPSC Civil Services interview with real Personality Test transcripts.**
+Search what boards actually asked, ask questions about it, and practise with an AI interview board that
+questions you, listens, and critiques your answers.
 
-- **Browse**: keyword search across every transcript, combined with drill-down by exam year → board and tags (background, optional, home state, interests, topics asked); highlighted matches and a formatted reader.
-- **Ask AI** (in Browse): ask a question and an LLM answers from the transcripts matching your current search and filters, with inline citations you can open.
-- **Interview**: practise with an AI board. Pick topics and add your DAF; the board writes new questions from your DAF, recent news and the most similar real questions from past interviews (or, with a toggle, asks real past questions only). Every answer is evaluated critically; a good answer earns up to two follow-ups. Coach mode shows feedback after each answer (and a "How have boards asked this?" helper with similar moments from real transcripts); Exam mode only in the end report.
+**Try it: [dholpurhouse.in](https://dholpurhouse.in)**
 
-> Transcripts are candidates' own recollections. Answers are generated from them and can be wrong, so always check the cited sources.
->
-> Dholpur House is an independent, non-commercial project, not affiliated with the UPSC, the Government of India, the source Telegram channel or Telegram. See the [Disclaimer](DISCLAIMER.md). Want to help? See [CONTRIBUTING.md](CONTRIBUTING.md). Found a security issue? See [SECURITY.md](SECURITY.md).
+![Searching transcripts for "cooperative federalism", filtered by exam year, board and topic](docs/screenshots/browse.png)
 
-## Data credit
+## What you can do
 
-All interview transcripts come from the public Telegram channel
-**[Interview Transcripts (CSPT-2026)](https://t.me/csetranscripts)** (@csetranscripts). Full credit goes to the
-channel's admins and to the candidates who shared their experiences. This project only makes them searchable and
-claims no ownership. If you are the channel admin or an author and want any of it removed, please
-[open an issue](https://github.com/abhinaymaddha/dholpur-house/issues) or contact @abhinaymaddha on GitHub and it will be
-removed. Details in [DATA.md](DATA.md).
+- **Browse.** Search every transcript by keyword, then narrow down by exam year and board, the candidate's
+  background, optional subject, home state, interests, and the topics asked. Matches are highlighted, and each
+  transcript opens in a clean reader that separates the Chairperson's and each member's questions.
+- **Ask AI.** Ask a question such as *"What do boards ask engineers about rural postings?"* and get an answer
+  drawn from the transcripts matching your search and filters, with citations you can open.
+- **Interview.** Pick topics, add your DAF details, and practise with an AI board. It writes new questions from
+  your background, recent news and the most similar real questions from past interviews, or asks real past
+  questions only. Every answer gets a critical, specific evaluation; a good answer earns up to two follow-ups.
+  Coach mode gives feedback after each answer; Exam mode saves it for a report at the end.
 
-## How it works
+![An answer evaluated by the AI board: scores, a critique, a quoted weak spot and a better way to say it](docs/screenshots/interview.png)
 
-```
-Telegram Desktop export (messages.html)
-   │  backend/app/ingest
-   ├─ parse      one record per message
-   ├─ segment    join transcripts split by Telegram's 4096-char limit, drop channel noise,
-   │             remove reposts (kept: the longest copy)
-   ├─ classify   accept clearly marked transcripts (header + questions); hold the rest
-   ├─ metadata   board, alias, date, DAF, optional, PT marks (rules, no LLM)
-   └─ chunk      split each transcript at member sections (Chairman / M1 / ...) and embed locally
-   ▼
-Postgres + pgvector
-   ├─ transcripts  full text + tsvector (keyword search)
-   ├─ chunks       section text + tsvector + 384-d embedding (RAG retrieval)
-   └─ held         units not loaded as transcripts, with the reason
-   ▼
-FastAPI  /api/search  /api/transcripts/{id}  /api/stats  /api/ask (server-sent events)
-   ▼
-React (Vite + Tailwind)  Browse (search + filters + Ask AI) · Interview · transcript reader
-```
+> Transcripts are candidates' own recollections, and AI answers and feedback can be wrong. Always check the
+> sources. Dholpur House is an independent, non-commercial project, not affiliated with the UPSC or the source
+> channel; see the [Disclaimer](DISCLAIMER.md).
 
-**Retrieval for Ask** runs vector similarity and full-text match over chunks, fuses the two rankings (reciprocal rank fusion), groups by transcript, and sends the top transcripts' best sections to the LLM you configure (see [Bring your own model](#bring-your-own-model)). Embeddings are computed locally with [fastembed](https://github.com/qdrant/fastembed) (`paraphrase-multilingual-MiniLM-L12-v2`, handles Hindi), so only answer generation needs an API key.
+## The transcripts and who to thank
 
-## Data
+Every transcript comes from the public Telegram channel
+**[Interview Transcripts (CSPT-2026)](https://t.me/csetranscripts)** (@csetranscripts). All credit goes to the
+channel's admins and to the candidates who wrote down their interviews so others could prepare. This project only
+makes them searchable and claims no ownership.
 
-`backend/seed/csetranscripts_messages.jsonl` holds every message from the public Telegram channel
-[@csetranscripts](https://t.me/csetranscripts) (text only, one JSON object per message, emails and phone numbers
-removed; see [DATA.md](DATA.md)). On first start, when the
-database is empty, the backend loads it automatically (a few minutes: transcripts are parsed and embedded).
+Personal details are removed automatically: email addresses, phone numbers, roll numbers, Telegram usernames and
+links to personal channels. The names and aliases candidates chose to share are kept, so they keep the credit.
+Many wrote under pseudonyms; please don't use this project to link anyone to a real identity.
 
-To load a newer export:
+If you are an author or a channel admin and want something removed, please
+[open an issue](https://github.com/abhinaymaddha/dholpur-house/issues) or contact
+[@abhinaymaddha](https://github.com/abhinaymaddha) on GitHub. More in [DATA.md](DATA.md).
 
-- **CLI:** `python -m app.ingest "<ChatExport folder>"` (or `--write-seed "<folder>"` to refresh the committed seed).
-- **HTTP** (set `ADMIN_TOKEN` first; no shell access needed on a hosted server):
-  ```bash
-  curl -H "Authorization: Bearer $ADMIN_TOKEN" -F "files=@messages.html" https://<host>/api/admin/ingest
-  curl -H "Authorization: Bearer $ADMIN_TOKEN" https://<host>/api/admin/ingest     # progress
-  ```
+## Run your own copy
 
-Make an export in Telegram Desktop: channel → ⋮ → Export chat history → format HTML, media not needed.
-Every ingest replaces all data with the given messages.
-
-## Run it locally
-
-Requirements: Docker with Compose, and an API key for an LLM provider (OpenRouter, OpenAI, Anthropic, or any
-OpenAI-compatible server; a local Ollama needs no key).
+You need Docker with Compose, and an API key for an AI provider: OpenRouter, OpenAI, Anthropic or any
+OpenAI-compatible server. A local model through Ollama needs no key.
 
 ```bash
-cp backend/.env.example backend/.env        # put your provider's API key in it
-# optional: edit backend/models.toml to choose provider and models (default: a free OpenRouter model)
-docker compose up -d --build                # db + backend + frontend on http://localhost:8710
+git clone https://github.com/abhinaymaddha/dholpur-house.git && cd dholpur-house
+cp backend/.env.example backend/.env        # add your provider's API key
+docker compose up -d --build                # then open http://localhost:8710
 ```
 
-The first start loads the seed data (about 12 minutes on a laptop CPU: every transcript section and every question is
-embedded) and downloads the embedding model (~220 MB) into a volume.
+The first start loads the transcripts that ship with the repo. That takes 10 to 15 minutes on a laptop, since
+every transcript section and every question is embedded locally; the page shows a notice until it's ready.
+Searching and real past questions work without any API key; Ask AI and generated interview questions need one.
 
-## Deploy with Dokploy
+**Loading a newer export.** In Telegram Desktop, open the channel → ⋮ → *Export chat history* (HTML, no media),
+then run `python -m app.ingest "<export folder>"` in the backend container. On a hosted server, set
+`ADMIN_TOKEN` and upload instead:
+`curl -H "Authorization: Bearer $ADMIN_TOKEN" -F "files=@messages.html" https://<your-site>/api/admin/ingest`.
+Each load replaces all the data.
 
-1. Create a **Compose** service from this GitHub repo, compose path `./docker-compose.prod.yml`.
-2. Environment:
-   ```
-   POSTGRES_PASSWORD=<long random string>
-   OPENROUTER_API_KEY=<key>                # or OPENAI_API_KEY / ANTHROPIC_API_KEY, matching models.toml
-   ADMIN_TOKEN=<long random string>        # optional, enables /api/admin/ingest
-   # optional limits on Ask AI and Interview (defaults shown); keep the budget under your provider's daily limit
-   RATE_PER_MINUTE=10                      # per visitor
-   RATE_PER_DAY=150                        # per visitor
-   AI_DAILY_BUDGET=900                     # model calls per day, whole site
-   ```
-3. Domains: service `frontend`, port `80`, HTTPS on.
-4. Deploy. The database seeds itself on first start; the UI shows a notice until it's ready.
+## Choose your AI model
 
-Plan for about 2 GB of RAM (embedding model + Postgres).
-
-## Bring your own model
-
-Everything about which LLM is used lives in **`backend/models.toml`**:
-
-- **`[providers.*]`**: where requests go. `kind` is `openrouter`, `openai`, `anthropic` (official Claude SDK) or
-  `openai_compatible` (Groq, Together, DeepSeek, Mistral, Gemini's OpenAI endpoint, Ollama, vLLM, LM Studio, …),
-  plus `base_url` and the environment variable holding the key (`api_key_env`). For a private local setup you can
-  put the key inline as `api_key` instead (don't commit it).
-- **`[models.model_1|2|3]`**: the slot each part of the app uses, pointing at a provider and a model id:
+Which models are used is set in [`backend/models.toml`](backend/models.toml), so you can switch providers without
+touching code. Each part of the app uses a named slot:
 
 | Slot | Used for |
 |---|---|
-| `model_1` | Ask AI (Browse): answers from retrieved transcripts |
-| `model_2` | Interview: writes new questions |
-| `model_3` | Interview: critical evaluation of each answer and follow-up questions |
+| `model_1` | Ask AI: answers from the retrieved transcripts |
+| `model_2` | Interview: writing new questions |
+| `model_3` | Interview: evaluating answers and choosing follow-ups |
 
-Switching, for example, the evaluator to Claude:
+For example, to use Claude for the evaluator, point the slot at the `anthropic` provider and set
+`ANTHROPIC_API_KEY` in `backend/.env`:
 
 ```toml
 [models.model_3]
 provider = "anthropic"
 id = "claude-opus-5-5"
 reasoning_effort = "medium"
-fallbacks = "default"        # let the Claude API retry a declined request on a fallback model
 ```
 
-and set `ANTHROPIC_API_KEY` in `backend/.env`. The file is re-read on change; no restart needed. If a provider has
-no JSON-schema support, set `json_mode = "object"` (or `"prompt"`) on the slot. The shipped default is a free
-OpenRouter model (limited to 50 requests a day on accounts without credits); the evaluator in particular benefits from
-a stronger model.
+Providers can be `openrouter`, `openai`, `anthropic` or `openai_compatible` (Groq, Together, DeepSeek, Mistral,
+Gemini's OpenAI endpoint, Ollama, vLLM, LM Studio and others). The file is re-read when it changes, so no restart
+is needed. The shipped default is a free OpenRouter model: it works, but free accounts get 50 requests a day
+(1,000 once you have bought $10 of credit), and the evaluator benefits most from a stronger model.
 
-A provider with its own API can be added in code: subclass `LLMProvider` (`backend/app/llm/base.py`), implement
-`complete_json` and `stream_text`, give it a `kind`, and register it with `@register` from `app.llm.registry`
-(see `OpenRouterProvider` for a small example that only overrides a few hooks).
+## Deploy it
 
-## Interview mode
+The repo includes [`docker-compose.prod.yml`](docker-compose.prod.yml) for [Dokploy](https://dokploy.com) (or
+any setup with Traefik). In Dokploy:
 
-- **How questions are made (default):** for each question, `model_2` gets the topic guidance, your DAF, the chosen
-  board's style, recent articles (for news topics), about 15 real past questions closest in meaning to the topic,
-  your DAF and the headlines (each with the follow-up the board asked next), and the full question lists of two
-  candidates whose profile best matches your DAF. It writes one new question in that style
-  (`prompts/question.md`).
-- **Real past questions only:** a toggle that skips generation and asks the closest real questions directly; no LLM call.
-- **Question search:** every question from every transcript is embedded at ingest (`questions.embedding`), so "similar
-  questions" means similar in meaning, not just sharing a tag. Profile and board stay transcript-level tags.
-- **Topics and prompts:** `backend/app/interview/prompts/topics/*.md`, one file per topic. The header says whether the
-  topic uses current affairs (`news: yes`) or needs the DAF (`daf: required`); the body is the guidance the question
-  writer and evaluator see. `question.md` and `evaluate.md` are the templates. Prompt files are read on every call:
-  edit and try again, no restart.
-- **Current affairs:** `backend/sources.toml` lists RSS/Atom feeds. Articles are tagged with topics by the same rules
-  as transcripts and refreshed every few hours (or `POST /api/admin/news/refresh`).
-- **Rules (in code, `app/interview/engine.py`):** an answer is "good" only if every score is at least 3 and the average
-  at least 3.5; good answers get up to two follow-ups, anything else gets critique and the next question. Each answer
-  costs one LLM call (`model_3`); follow-up examples come from the real questions most similar to the one asked.
+1. Create a **Compose** service from this repo with compose path `./docker-compose.prod.yml`.
+2. Set the environment:
+   ```
+   POSTGRES_PASSWORD=<long random string>
+   OPENROUTER_API_KEY=<key>                # or OPENAI_API_KEY / ANTHROPIC_API_KEY, to match models.toml
+   ADMIN_TOKEN=<long random string>        # optional: enables uploading a new export
+   RATE_PER_MINUTE=10                      # optional limits on the AI features (defaults shown):
+   RATE_PER_DAY=150                        #   per visitor, per minute and per day
+   AI_DAILY_BUDGET=900                     #   AI calls per day for the whole site; keep it under your provider's limit
+   ```
+3. Add your domain to the `frontend` service on port 80, with HTTPS.
+4. Deploy. The database fills itself on first start.
 
-## Develop
+Plan for about 2 GB of RAM for the embedding model and Postgres.
 
-```bash
-# backend
-cd backend
-python -m venv .venv && source .venv/bin/activate
-make install
-docker compose up -d db                     # from the repo root, or point DATABASE_URL at any Postgres with pgvector
-make dev                                    # API on :8000
-make test
-
-# frontend
-cd frontend
-npm install
-npm run dev                                 # http://localhost:5173, proxies /api to :8000
-```
-
-Or, once both are set up, `./scripts/dev.sh` runs the API and the frontend together with auto-reload.
-
-### Tests
-
-Both halves are fully tested, and CI (`.github/workflows/ci.yml`) runs everything on every push.
-
-- **Backend** (`cd backend && make test`): pytest against a real Postgres + pgvector database. The suite
-  ingests a small synthetic Telegram export (`tests/fixtures/export.py`) through the real pipeline, swaps the
-  embedding model for a deterministic stand-in and every LLM call for a scripted fake provider, so it needs no
-  model download, network or API key. It uses `TEST_DATABASE_URL`
-  (default `postgresql://upsc:upsc@localhost:5432/upsc_test`; create it with
-  `psql -d postgres -c "CREATE DATABASE upsc_test OWNER upsc"` and `psql -d upsc_test -c "CREATE EXTENSION vector"`).
-  The tests drop and recreate the tables in that database, so never point it at real data. Coverage below 95% fails.
-- **Frontend** (`cd frontend && npm test`, or `npm run test:coverage`): vitest + Testing Library with the API
-  client mocked. Coverage thresholds live in `vitest.config.ts`.
-
-On macOS without Docker, Postgres can come from Homebrew:
-
-```bash
-brew install postgresql@17 pgvector python@3.12 && brew services start postgresql@17
-psql -d postgres -c "CREATE ROLE upsc LOGIN PASSWORD 'upsc'" -c "CREATE DATABASE upsc OWNER upsc"
-psql -d upsc -c "CREATE EXTENSION vector"
-cd backend && python3.12 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/python -m app.ingest --seed       # load the committed data (~5 min)
-```
-
-## Repository layout
+## How it works
 
 ```
-backend/
-  app/
-    main.py            FastAPI app, error handler, startup (schema, seeding, warm-ups)
-    config.py          settings from environment / .env
-    database.py        connection pool + schema
-    dependencies.py    shared repository/service instances for routes (overridable in tests)
-    errors.py          AppError hierarchy → HTTP status codes
-    api/routes/        search, transcripts, stats, ask, interview, admin, health
-    schemas/           response and request models
-    repositories/      all SQL: transcripts, chunks, questions, interviews, news
-    llm/               LLMProvider base + OpenAI-compatible, OpenAI, OpenRouter, Anthropic; registry
-    services/          HybridRetriever, NewsService, Ask answers, embeddings, ingest jobs
-    interview/         InterviewSession, QuestionSource (generated / real), evaluator, prompts/
-    ingest/            Telegram export → Postgres
-  seed/                committed channel messages (JSONL), loaded on first start
-  models.toml          LLM providers and model slots
-  sources.toml         current-affairs feeds
-  prompt_eval/         prompt test cases + runner
-  tests/               unit + integration tests, fixtures (synthetic export, fakes)
-frontend/
-  src/
-    components/        BrowseView, AskPanel, interview/, TranscriptPanel, ...
-    services/api.ts    API client (incl. the server-sent events reader)
-    lib/ hooks/ types/
-    test/              test setup and fixtures (tests sit next to the code as *.test.tsx)
-.github/workflows/ci.yml   backend + frontend tests on every push
-docker-compose.yml       local stack (publishes :8710)
-docker-compose.prod.yml  Dokploy stack (Traefik via dokploy-network)
+Telegram export ──► ingest: join split messages, drop reposts and chatter, keep clearly marked transcripts,
+                    read board / DAF / optional / marks, tag topics, redact personal details,
+                    split into member sections and individual questions, embed them locally
+                ──► Postgres + pgvector: transcripts, sections and every question asked, each searchable
+                    by keyword and by meaning
+                ──► FastAPI ──► React app: Browse · Ask AI · Interview
 ```
+
+- **Ask AI** ranks transcript sections two ways, by meaning (vector similarity) and by keywords (full-text
+  search), merges the rankings, and gives the best sections of the top transcripts to the model, which must cite
+  them.
+- **Interview questions** are written from the topic's guidance, your DAF, the chosen board's style, recent news
+  for current-affairs topics, the real past questions closest in meaning (with what the board asked next), and the
+  full interviews of candidates whose profile is most like yours.
+- **Evaluation** is meant to be strict but fair, and must not invent facts. Every criticism must quote your own
+  words, and code checks remove any quote that isn't in your answer and any recent date or figure that isn't in
+  the question, your answer or the news item. The rules for follow-ups live in code, not in the prompt: only an
+  answer scoring at least 3 on every dimension and 3.5 on average earns one, and a question gets at most two.
+- **Embeddings** are computed locally with [fastembed](https://github.com/qdrant/fastembed)
+  (`paraphrase-multilingual-MiniLM-L12-v2`, which also handles Hindi), so only the AI features need an API key.
+
+## Contributing
+
+Bug reports, better prompts, new interview topics and fixes are all welcome. [CONTRIBUTING.md](CONTRIBUTING.md)
+covers setting up a development environment, running the tests, how the code is organised, and how to measure
+prompt changes. Found a security problem? Please report it privately, as described in [SECURITY.md](SECURITY.md).
 
 ## License
 
-Code, prompts and docs: [CC BY-NC 4.0](LICENSE). Free to use, share and adapt for non-commercial purposes, with
-credit. **Commercial use needs permission:** [open an issue](https://github.com/abhinaymaddha/dholpur-house/issues) or
-contact @abhinaymaddha on GitHub.
+The code, prompts and documentation are licensed under [CC BY-NC 4.0](LICENSE): free to use, share and adapt
+for non-commercial purposes, with credit. **Commercial use needs permission**:
+[open an issue](https://github.com/abhinaymaddha/dholpur-house/issues) or contact
+[@abhinaymaddha](https://github.com/abhinaymaddha) on GitHub.
 
-The transcripts are not covered by this license; they belong to their authors (see [Data credit](#data-credit) and
-[DATA.md](DATA.md)). Candidates often posted under pseudonyms: please don't use this project to attach real identities
-to them.
+The transcripts are not covered by this license. They belong to their authors; see [DATA.md](DATA.md).
