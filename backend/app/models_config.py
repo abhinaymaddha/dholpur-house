@@ -28,8 +28,8 @@ class ProviderConfig:
             return self.api_key
         value = os.environ.get(self.api_key_env or "", "")
         if not value:
-            raise ConfigError(f"No API key for provider '{self.name}': set {self.api_key_env} in backend/.env "
-                              f"(or api_key in models.toml)")
+            raise ConfigError(f"No API key for provider '{self.name}': set the {self.api_key_env} environment variable "
+                              f"(backend/.env locally, or your host's environment settings) or api_key in models.toml")
         return value
 
 

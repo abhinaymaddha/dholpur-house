@@ -2,7 +2,8 @@
 
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from email.utils import format_datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -98,12 +99,13 @@ def test_similar_candidates_and_board_examples():
 RSS = """<?xml version="1.0"?><rss version="2.0"><channel><title>t</title>
 <item><title>India and China agree on border patrolling</title><link>https://n.test/a</link>
 <description>&lt;p&gt;Talks on the border &amp;amp; trade&lt;/p&gt;</description>
-<pubDate>Mon, 12 Oct 2026 10:00:00 GMT</pubDate></item>
+<pubDate>{published}</pubDate></item>
 <item><title>RBI keeps the repo rate unchanged</title><link>https://n.test/b</link><description>inflation</description></item>
 <item><title>A recipe for mango pickle</title><link>https://n.test/c</link></item>
 <item><title></title><link>https://n.test/d</link></item>
 </channel></rss>"""
 
+RSS = RSS.replace("{published}", format_datetime(datetime.now(timezone.utc) - timedelta(days=1), usegmt=True))
 
 @pytest.fixture
 def news(sql, monkeypatch):
