@@ -22,14 +22,14 @@ independent, non-commercial project, and the transcripts belong to their authors
 
 ## Setting up
 
-You need Python 3.12, Node 24 and Postgres 17 with the pgvector extension. No API key is needed to run the
+You need Python 3.14, Node 26 and Postgres 17 with the pgvector extension. No API key is needed to run the
 tests; only Ask AI and generated interview questions need one to run the app (see
 [Choose your AI model](README.md#choose-your-ai-model)).
 
 ```bash
 # backend
 cd backend
-python3.12 -m venv .venv && source .venv/bin/activate
+python3.14 -m venv .venv && source .venv/bin/activate
 make install
 docker compose up -d db                     # from the repo root, or point DATABASE_URL at any Postgres with pgvector
 python -m app.ingest --seed                 # load the transcripts that ship with the repo (10-15 min)
@@ -46,7 +46,7 @@ Once both are set up, `./scripts/dev.sh` starts the API and the frontend togethe
 On macOS without Docker, Postgres can come from Homebrew:
 
 ```bash
-brew install postgresql@17 pgvector python@3.12 && brew services start postgresql@17
+brew install postgresql@17 pgvector python@3.14 && brew services start postgresql@17
 psql -d postgres -c "CREATE ROLE upsc LOGIN PASSWORD 'upsc'" -c "CREATE DATABASE upsc OWNER upsc"
 psql -d upsc -c "CREATE EXTENSION vector"
 ```
