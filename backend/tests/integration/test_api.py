@@ -78,7 +78,11 @@ def test_interview_flow(client, fake_llm):
     assert r.status_code == 200 and r.json()["next"]["depth"] == 1
     turns = client.get(f"/api/interview/sessions/{sid}").json()
     assert len(turns) == 2 and turns[0]["answer"] == "Because."
-    assert client.get(f"/api/interview/sessions/{sid}/report").json()["answered"] == 1
+    assert "speech recognition" not in fake_llm.calls[-1]["messages"][0]["content"]
+    r = client.post("/api/interview/answer", json={"session_id": sid, "answer": "Because, see.", "spoken": True,
+                                                   "filters": filters})
+    assert r.status_code == 200 and "speech recognition" in fake_llm.calls[-1]["messages"][0]["content"]
+    assert client.get(f"/api/interview/sessions/{sid}/report").json()["answered"] == 2
     similar = client.get(f"/api/interview/turns/{first['turn']['id']}/similar").json()
     assert similar and all(s["transcript_id"] != first["turn"]["source"]["transcript_id"] for s in similar)
 

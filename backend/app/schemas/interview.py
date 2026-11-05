@@ -20,6 +20,7 @@ class AnswerRequest(BaseModel):
     session_id: UUID
     answer: str = Field(min_length=1, max_length=6000)
     mode: Literal["coach", "exam"] = "coach"
+    spoken: bool = False   # dictated with speech recognition: the evaluator forgives transcription errors
     filters: InterviewFilters
 
 

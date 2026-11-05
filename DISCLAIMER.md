@@ -42,10 +42,14 @@ no liability for any decision taken, or any loss suffered, on the basis of the c
 
 ## Your data
 
-Answers you type in Interview mode, and the DAF details you enter, are stored by the deployment you
+Answers you type or speak in Interview mode, and the DAF details you enter, are stored by the deployment you
 are using so that it can evaluate your answers and build your report, and are sent to the
 configured AI model provider for that purpose. Do not enter information you would not want stored
 or processed in this way.
+
+In Voice mode, your browser's own speech recognition turns your spoken answer into text, and only that
+text reaches the site; no audio is recorded or stored by it. Some browsers transcribe speech on their
+maker's servers (Chrome, for example, sends the audio to Google), under that browser's own privacy terms.
 
 ## Removal requests and contact
 

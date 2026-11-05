@@ -1,8 +1,9 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as api from '../../services/api'
 import { evaluation, stats, topics, turn } from '../../test/fixtures'
+import { FakeRecognition, installSpeech } from '../../test/speech'
 import type { InterviewReport, Turn } from '../../types'
 import { InterviewView } from './InterviewView'
 
@@ -57,7 +58,7 @@ it('runs a coach-mode conversation with feedback, a follow-up and a report', asy
   expect(await screen.findByText('Why does it matter?')).toBeInTheDocument()
   expect(screen.getByText('Follow-up 1 of 2')).toBeInTheDocument()
   expect(screen.getByText('Good enough for a follow-up')).toBeInTheDocument()
-  expect(m.interviewAnswer).toHaveBeenCalledWith('s1', 'Output of the economy', 'coach', expect.anything())
+  expect(m.interviewAnswer).toHaveBeenCalledWith('s1', 'Output of the economy', 'coach', expect.anything(), false)
 
   const report: InterviewReport = { answered: 1, skipped: 0, average: 3.25, verdicts: { good: 1, partial: 0, weak: 0 },
     dimensions: { relevance: 4 }, topics: [{ topic: 'Economy', answered: 1, average: 3.25 }], turns: [turns[0]] }
@@ -136,4 +137,116 @@ it('shows an empty report and the mobile filter toggle', async () => {
   await userEvent.click(await screen.findByRole('button', { name: 'Report' }))
   expect(await screen.findByText('Answer a few questions first to see a report.')).toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: /Filters \(1\)/ }))
+})
+
+describe('voice mode', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  const answerWith = (answer: string, mode: 'coach' | 'exam') => m.interviewAnswer.mockImplementation(async () => {
+    turns = [{ ...turns[0], answer, mode, evaluation: evaluation() }, turn({ id: 2, main_index: 2, question: 'Next one?' })]
+    return { evaluation: evaluation(), next: turns[1] }
+  })
+
+  it('reads the question aloud, then listens, and sends the spoken answer as spoken', async () => {
+    const speech = installSpeech()
+    render(<InterviewView stats={stats} onOpen={() => {}} />)
+    await userEvent.click(await screen.findByRole('button', { name: /Voice/ }))
+    await pickTopicAndStart()
+    await screen.findByText('What is GDP?')
+    expect(speech.spoken()).toEqual(['What is GDP?'])
+    expect(screen.getByText('The board is asking…')).toBeInTheDocument()
+
+    act(() => speech.finish())
+    expect(FakeRecognition.last.started).toBe(true)
+    expect(screen.getByPlaceholderText('Listening… speak your answer')).toBeInTheDocument()
+    expect(screen.getByText(/only the text reaches Dholpur House/)).toBeInTheDocument()
+    act(() => FakeRecognition.last.say(['Output of the economy', true]))
+    expect(screen.getByLabelText('Your answer')).toHaveValue('Output of the economy')
+
+    answerWith('Output of the economy', 'coach')
+    await userEvent.click(screen.getByRole('button', { name: 'Send answer' }))
+    expect(m.interviewAnswer).toHaveBeenCalledWith('s1', 'Output of the economy', 'coach', expect.anything(), true)
+    await screen.findByText('Next one?')
+    expect(speech.spoken()).toEqual(['What is GDP?', 'Next one?'])
+    expect(JSON.parse(localStorage.getItem('upsc-interview')!).voice).toBe(true)
+
+    await userEvent.click(screen.getByRole('button', { name: /Voice/ }))     // off: stops reading and listening
+    expect(speech.synth.cancel).toHaveBeenCalled()
+    act(() => speech.finish())
+    expect(screen.queryByPlaceholderText('Listening… speak your answer')).not.toBeInTheDocument()
+  })
+
+  it('in exam mode a spoken answer is locked; typing stops the mic; mic errors are shown', async () => {
+    installSpeech()
+    render(<InterviewView stats={stats} onOpen={() => {}} />)
+    await userEvent.click(await screen.findByRole('radio', { name: 'Exam Mode' }))
+    await pickTopicAndStart()
+    await screen.findByText('What is GDP?')
+
+    await userEvent.type(screen.getByLabelText('Your answer'), 'Typed')
+    await userEvent.click(screen.getByRole('button', { name: 'Speak your answer' }))
+    expect(screen.getByRole('button', { name: 'Stop speaking' })).toHaveAttribute('aria-pressed', 'true')
+    act(() => FakeRecognition.last.say(['and spoken', true]))
+    const box = screen.getByLabelText('Your answer')
+    expect(box).toHaveValue('Typed and spoken')
+    await userEvent.click(screen.getByRole('button', { name: 'Stop speaking' }))
+    expect(box).toHaveAttribute('readonly')
+    expect(screen.getByText(/a spoken answer can't be edited/)).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Coach Mode' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Speak your answer' }))
+    await userEvent.type(box, '!')                 // typing takes over from the microphone
+    expect(screen.getByRole('button', { name: 'Speak your answer' })).toBeInTheDocument()
+    expect(box).toHaveValue('Typed and spoken!')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Speak your answer' }))
+    act(() => FakeRecognition.last.fail('not-allowed'))
+    expect(screen.getByText(/Microphone access is blocked/)).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'New' }))
+    expect(screen.getByText('Practise with the board')).toBeInTheDocument()
+  })
+
+  it('reads any question aloud on request, and stops it to speak', async () => {
+    const speech = installSpeech()
+    render(<InterviewView stats={stats} onOpen={() => {}} />)
+    await pickTopicAndStart()
+    await screen.findByText('What is GDP?')
+    expect(speech.spoken()).toEqual([])                 // voice mode is off
+    await userEvent.click(screen.getByRole('button', { name: 'Read the question aloud' }))
+    expect(speech.spoken()).toEqual(['What is GDP?'])
+    await userEvent.click(screen.getByRole('button', { name: 'Speak your answer' }))
+    expect(FakeRecognition.last.started).toBe(true)
+    act(() => speech.finish())
+    expect(screen.queryByText('The board is asking…')).not.toBeInTheDocument()
+  })
+
+  it('without speech recognition: questions are read, answers typed', async () => {
+    const speech = installSpeech({ listen: false })
+    localStorage.setItem('upsc-interview', JSON.stringify({ voice: true, filters: { topics: ['Economy'] } }))
+    render(<InterviewView stats={stats} onOpen={() => {}} />)
+    await userEvent.click(screen.getAllByRole('button', { name: 'Start' })[0])
+    await screen.findByText('What is GDP?')
+    act(() => speech.finish())
+    expect(screen.queryByRole('button', { name: 'Speak your answer' })).not.toBeInTheDocument()
+    expect(screen.getByText(/can't transcribe speech/)).toBeInTheDocument()
+  })
+
+  it('with recognition but no speech synthesis, the microphone opens straight away', async () => {
+    vi.stubGlobal('webkitSpeechRecognition', FakeRecognition)
+    FakeRecognition.instances = []
+    localStorage.setItem('upsc-interview', JSON.stringify({ voice: true, filters: { topics: ['Economy'] } }))
+    render(<InterviewView stats={stats} onOpen={() => {}} />)
+    await userEvent.click(screen.getAllByRole('button', { name: 'Start' })[0])
+    await screen.findByText('What is GDP?')
+    expect(FakeRecognition.last.started).toBe(true)
+    expect(screen.queryByRole('button', { name: 'Read the question aloud' })).not.toBeInTheDocument()
+  })
+
+  it('has no voice controls where the browser has no speech support', async () => {
+    localStorage.setItem('upsc-interview', JSON.stringify({ voice: true }))
+    render(<InterviewView stats={stats} onOpen={() => {}} />)
+    await screen.findByText('Practise with the board')
+    expect(screen.queryByRole('button', { name: /Voice/ })).not.toBeInTheDocument()
+  })
 })

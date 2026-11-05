@@ -96,7 +96,7 @@ class InterviewSession:
         question, src = source.next(QuestionContext(topic=topic, board=filters.board, daf=daf, turns=turns))
         return self.repo.add_turn(self.id, main_index, 0, topic.name, question, src)
 
-    def answer(self, text: str, mode: str, filters: Filters) -> dict:
+    def answer(self, text: str, mode: str, filters: Filters, spoken: bool = False) -> dict:
         """Evaluate the answer to the open question; return the evaluation and the next question."""
         turns = self.turns
         pending = next((t for t in reversed(turns) if _open(t)), None)
@@ -110,7 +110,8 @@ class InterviewSession:
         followups_left = MAX_FOLLOWUPS - pending["depth"]
         pairs = [(r["text"], r["follow_up"]) for r in self.bank.similar([pending["question"]], n=12) if r["follow_up"]][:5]
         evaluation, follow_up = evaluator.evaluate(
-            pending["topic"], _context(pending["source"]), _reference(chain), exchange, text, followups_left, pairs)
+            pending["topic"], _context(pending["source"]), _reference(chain), exchange, text, followups_left, pairs,
+            spoken=spoken)
         self.repo.save_answer(pending["id"], text, evaluation, mode)
         if evaluation["verdict"] == "good" and followups_left > 0 and follow_up:
             nxt = self.repo.add_turn(self.id, pending["main_index"], pending["depth"] + 1, pending["topic"],
