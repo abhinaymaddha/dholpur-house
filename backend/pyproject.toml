@@ -6,4 +6,4 @@ filterwarnings = ["ignore:The anyio.abc.BlockingPortal alias is deprecated:Depre
 
 [tool.black]
 line-length = 110
-target-version = ["py312"]
+target-version = ["py314"]

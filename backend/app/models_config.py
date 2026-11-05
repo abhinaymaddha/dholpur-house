@@ -45,7 +45,7 @@ class ModelConfig:
     fallbacks: str | None = None
 
 
-_cache: dict = {"mtime": None, "models": {}}
+_cache: dict = {"text": None, "models": {}}
 
 
 def _path() -> Path:
@@ -83,11 +83,11 @@ def _parse(raw: dict) -> dict[str, ModelConfig]:
 
 def all_models() -> dict[str, ModelConfig]:
     """Parsed models.toml, re-read whenever the file changes."""
-    path = _path()
-    mtime = path.stat().st_mtime
-    if _cache["mtime"] != mtime:
-        _cache["models"] = _parse(tomllib.loads(path.read_text(encoding="utf-8")))
-        _cache["mtime"] = mtime
+    # Compared by content, not mtime: two edits within one filesystem timestamp tick must both be seen.
+    text = _path().read_text(encoding="utf-8")
+    if _cache["text"] != text:
+        _cache["models"] = _parse(tomllib.loads(text))
+        _cache["text"] = text
     return _cache["models"]
 
 

@@ -11,14 +11,14 @@ from app.models_config import ProviderConfig, all_models, get_model
 def toml(tmp_path, monkeypatch):
     path = tmp_path / "models.toml"
     monkeypatch.setattr(models_config.settings, "models_file", str(path))
-    monkeypatch.setitem(models_config._cache, "mtime", None)
+    monkeypatch.setitem(models_config._cache, "text", None)
 
     def write(text):
         path.write_text(text)
         os.utime(path, (path.stat().st_mtime + 1,) * 2)   # a new mtime even within the same second
         return path
     yield write
-    monkeypatch.setitem(models_config._cache, "mtime", None)
+    monkeypatch.setitem(models_config._cache, "text", None)
 
 
 GOOD = """
