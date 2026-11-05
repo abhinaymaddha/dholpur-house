@@ -114,10 +114,11 @@ export async function interviewNext(sessionId: string | null, filters: Interview
 }
 
 export async function interviewAnswer(
-  sessionId: string, answer: string, mode: 'coach' | 'exam', filters: InterviewFilters,
+  sessionId: string, answer: string, mode: 'coach' | 'exam', filters: InterviewFilters, spoken = false,
 ): Promise<{ evaluation: Evaluation; next: Turn }> {
   try {
-    return (await http.post('/api/interview/answer', { session_id: sessionId, answer, mode, filters: interviewBody(filters) })).data
+    return (await http.post('/api/interview/answer',
+      { session_id: sessionId, answer, mode, spoken, filters: interviewBody(filters) })).data
   } catch (e) { throw detail(e) }
 }
 

@@ -44,7 +44,9 @@ describe('REST calls', () => {
     await api.interviewAnswer('s1', 'An answer', 'exam', f)
     expect(http.post.mock.calls[0]).toEqual(['/api/interview/next', { session_id: null,
       filters: { topics: ['Economy'], board: null, daf: null, question_mode: 'real' } }])
-    expect(http.post.mock.calls[1][1]).toMatchObject({ session_id: 's1', answer: 'An answer', mode: 'exam' })
+    expect(http.post.mock.calls[1][1]).toMatchObject({ session_id: 's1', answer: 'An answer', mode: 'exam', spoken: false })
+    await api.interviewAnswer('s1', 'Spoken', 'coach', f, true)
+    expect(http.post.mock.calls[2][1]).toMatchObject({ answer: 'Spoken', spoken: true })
   })
 
   it('turns API errors into readable messages', async () => {

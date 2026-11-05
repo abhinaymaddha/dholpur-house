@@ -58,7 +58,7 @@ def answer(req: AnswerRequest, request: Request, sessions: SessionFactory = Depe
            limiter: RateLimiter = Depends(get_rate_limiter)):
     """Evaluate the answer to the open question; returns the evaluation and the next question (follow-up or new)."""
     limiter.check(client_ip(request))
-    return sessions.open(req.session_id).answer(req.answer, req.mode, _filters(req.filters))
+    return sessions.open(req.session_id).answer(req.answer, req.mode, _filters(req.filters), spoken=req.spoken)
 
 
 @router.get("/sessions/{session_id}", response_model=list[Turn])

@@ -11,7 +11,7 @@ The only facts you may treat as given, besides the question and the candidate's 
 {{reference}}
 
 ## The exchange so far on this question
-{{exchange}}
+{{exchange}}{{transcription_note}}
 
 ## How boards follow up on similar questions (real examples)
 {{followup_examples}}

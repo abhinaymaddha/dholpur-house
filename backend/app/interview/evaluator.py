@@ -141,8 +141,16 @@ def score(evaluation: dict) -> dict:
     return evaluation
 
 
+TRANSCRIPTION_NOTE = (
+    "\n\nThe latest answer was spoken aloud and written down by automatic speech recognition. Ignore spelling, "
+    "punctuation, capitalisation and run-on sentences. Where a word is evidently misheard (a similar-sounding "
+    "word that makes no sense in context), judge what the candidate clearly meant: do not quote it as an issue "
+    "or count it as a factual error.")
+
+
 def evaluate(topic_name: str, context: str, reference: str, exchange: str, answer: str,
-             followups_left: int, followup_pairs: list[tuple[str, str]]) -> tuple[dict, str | None]:
+             followups_left: int, followup_pairs: list[tuple[str, str]],
+             spoken: bool = False) -> tuple[dict, str | None]:
     """Evaluate the latest answer. Returns (evaluation, follow-up question or None)."""
     topic = prompts.topic(topic_name)
     instruction = (
@@ -157,7 +165,7 @@ def evaluate(topic_name: str, context: str, reference: str, exchange: str, answe
         context=context, reference=reference or "(none: judge facts only against stable, well-established knowledge)",
         exchange=exchange,
         followup_examples="\n".join(f"- Q: {q}\n  Follow-up: {f}" for q, f in followup_pairs) or "- (none found)",
-        followup_instruction=instruction)
+        followup_instruction=instruction, transcription_note=TRANSCRIPTION_NOTE if spoken else "")
     evaluation = llm.complete_json(MODEL, [{"role": "user", "content": prompt}], SCHEMA, "evaluation")
     follow_up = evaluation.pop("follow_up_question", None)
     evaluation = score(guard(evaluation, answer, allowed=f"{exchange}\n{reference}"))

@@ -1,5 +1,9 @@
-import { ClipboardList, ExternalLink, History, Loader2, Play, RotateCcw, Send, SkipForward, SlidersHorizontal } from 'lucide-react'
+import {
+  ClipboardList, ExternalLink, History, Loader2, Mic, Play, RotateCcw, Send, SkipForward, SlidersHorizontal, Square, Volume2,
+} from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { useDictation } from '../../hooks/useDictation'
+import { canListen, canSpeak, speak, stopSpeaking } from '../../lib/speech'
 import {
   getInterviewReport, getInterviewSession, getInterviewTopics, getSimilarQuestions, interviewAnswer, interviewNext,
 } from '../../services/api'
@@ -11,16 +15,19 @@ type Mode = 'coach' | 'exam'
 const STORE = 'upsc-interview'
 const DEFAULT_FILTERS: InterviewFilters = { topics: [], board: '', daf: '', question_mode: 'generated' }
 
-function load(): { sessionId: string | null; mode: Mode; filters: InterviewFilters } {
+interface Saved { sessionId: string | null; mode: Mode; voice: boolean; filters: InterviewFilters }
+
+function load(): Saved {
   try {
     const raw = JSON.parse(localStorage.getItem(STORE) || '{}')
-    return { sessionId: raw.sessionId ?? null, mode: raw.mode ?? 'coach', filters: { ...DEFAULT_FILTERS, ...raw.filters } }
+    return { sessionId: raw.sessionId ?? null, mode: raw.mode ?? 'coach', voice: raw.voice === true,
+             filters: { ...DEFAULT_FILTERS, ...raw.filters } }
   } catch {
-    return { sessionId: null, mode: 'coach', filters: DEFAULT_FILTERS }
+    return { sessionId: null, mode: 'coach', voice: false, filters: DEFAULT_FILTERS }
   }
 }
 
-function save(state: { sessionId: string | null; mode: Mode; filters: InterviewFilters }) {
+function save(state: Saved) {
   try { localStorage.setItem(STORE, JSON.stringify(state)) } catch { /* private mode: state just won't persist */ }
 }
 
@@ -37,22 +44,45 @@ export function InterviewView({ stats, onOpen }: { stats: Stats | null; onOpen: 
   const [draft, setDraft] = useState('')
   const [report, setReport] = useState<InterviewReport | null>(null)
   const [showFilters, setShowFilters] = useState(false)
+  const [voice, setVoice] = useState(initial.voice && (canSpeak() || canListen()))
+  const [spoken, setSpoken] = useState(false)   // the draft was (at least partly) dictated
+  const [speaking, setSpeaking] = useState(false)
+  const dictation = useDictation((text) => { setDraft(text); setSpoken(true) })
+  const voiceOn = useRef(voice)
   const bottom = useRef<HTMLDivElement>(null)
 
   useEffect(() => { getInterviewTopics().then(setTopics).catch(() => setTopics([])) }, [])
   useEffect(() => {
     if (initial.sessionId) getInterviewSession(initial.sessionId).then(setTurns).catch(() => setSessionId(null))
   }, [initial.sessionId])
-  useEffect(() => save({ sessionId, mode, filters }), [sessionId, mode, filters])
+  useEffect(() => save({ sessionId, mode, voice, filters }), [sessionId, mode, voice, filters])
+  useEffect(() => { voiceOn.current = voice }, [voice])
+  useEffect(() => () => stopSpeaking(), [])
   useEffect(() => { bottom.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }) }, [turns, busy, report])
 
   const open = [...turns].reverse().find((t) => t.answer === null && !t.evaluation?.skipped)
 
+  const quiet = () => { dictation.stop(); stopSpeaking(); setSpeaking(false) }
+
+  /** Voice mode: the board reads the question aloud, then the microphone opens for the answer. */
+  const askAloud = (question: string) => {
+    if (!canSpeak()) { if (canListen()) dictation.start(''); return }
+    setSpeaking(true)
+    speak(question, () => {
+      setSpeaking(false)
+      if (voiceOn.current && canListen()) dictation.start('')
+    })
+  }
+
   const run = async (kind: 'asking' | 'evaluating', action: () => Promise<string>) => {
+    quiet()
     setBusy(kind); setError(''); setReport(null)
     try {
       const sid = await action()
-      setTurns(await getInterviewSession(sid))
+      const fresh = await getInterviewSession(sid)
+      setTurns(fresh)
+      const asked = [...fresh].reverse().find((t) => t.answer === null && !t.evaluation?.skipped)
+      if (voiceOn.current && asked) askAloud(asked.question)
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -70,13 +100,30 @@ export function InterviewView({ stats, onOpen }: { stats: Stats | null; onOpen: 
     const text = draft.trim()
     if (!text || !sessionId || !open || busy) return
     run('evaluating', async () => {
-      await interviewAnswer(sessionId, text, mode, filters)
-      setDraft('')
+      await interviewAnswer(sessionId, text, mode, filters, spoken)
+      setDraft(''); setSpoken(false)
       return sessionId
     })
   }
 
-  const newConversation = () => { setSessionId(null); setTurns([]); setReport(null); setError(''); setDraft('') }
+  const toggleVoice = () => {
+    if (voice) quiet()
+    setVoice(!voice)
+  }
+  const toggleMic = () => {
+    if (dictation.listening) { dictation.stop(); return }
+    stopSpeaking(); setSpeaking(false)
+    dictation.start(draft)
+  }
+  const readAloud = (question: string) => { dictation.stop(); setSpeaking(true); speak(question, () => setSpeaking(false)) }
+
+  // Exam mode is like the room: once an answer has been spoken, it can't be edited before sending.
+  const locked = mode === 'exam' && spoken
+  const listenable = canListen()
+
+  const newConversation = () => {
+    quiet(); setSessionId(null); setTurns([]); setReport(null); setError(''); setDraft(''); setSpoken(false)
+  }
   const showReport = async () => { if (sessionId) setReport(await getInterviewReport(sessionId)) }
 
   return (
@@ -119,7 +166,7 @@ export function InterviewView({ stats, onOpen }: { stats: Stats | null; onOpen: 
             return (
               <div key={t.id} className="space-y-3">
                 {t.depth === 0 && t.main_index > 1 && <hr className="border-stone-100 dark:border-stone-800" />}
-                <BoardBubble t={t} onOpen={onOpen} coach={mode === 'coach'} />
+                <BoardBubble t={t} onOpen={onOpen} coach={mode === 'coach'} onSpeak={canSpeak() ? readAloud : undefined} />
                 {ev?.skipped && <p className="pl-10 text-xs text-stone-400">Skipped</p>}
                 {t.answer && <CandidateBubble text={t.answer} />}
                 {t.answer && ev && !ev.skipped && (
@@ -144,22 +191,40 @@ export function InterviewView({ stats, onOpen }: { stats: Stats | null; onOpen: 
 
         <footer className="space-y-2 border-t border-stone-200 p-3 dark:border-stone-800">
           <div className="flex items-center justify-between gap-2">
-            <ModeToggle mode={mode} onChange={setMode} />
+            <div className="flex flex-wrap items-center gap-2">
+              <ModeToggle mode={mode} onChange={setMode} />
+              {(canSpeak() || listenable) && <VoiceToggle on={voice} onToggle={toggleVoice} />}
+            </div>
             <button onClick={nextQuestion} disabled={busy !== null || !filters.topics.length}
               className="inline-flex items-center gap-1 text-xs text-stone-500 hover:text-sandstone-600 disabled:opacity-40">
               <SkipForward size={13} /> {turns.length ? 'Next question' : 'Start'}
             </button>
           </div>
           <div className="flex gap-2">
-            <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={3} disabled={!open || busy !== null}
+            <textarea value={draft} rows={3} disabled={!open || busy !== null} readOnly={locked} aria-label="Your answer"
+              onChange={(e) => { dictation.stop(); setDraft(e.target.value) }}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
-              placeholder={open ? 'Answer as you would in the room… (Enter to send, Shift+Enter for a new line)' : 'Start or ask for the next question first'}
-              className="flex-1 resize-none rounded-lg border border-stone-300 bg-white p-2.5 text-[15px] focus:border-sandstone-500 focus:ring-2 focus:ring-sandstone-500/20 focus:outline-none disabled:bg-stone-50 dark:border-stone-700 dark:bg-stone-950 dark:disabled:bg-stone-900" />
-            <button onClick={send} disabled={!open || !draft.trim() || busy !== null} aria-label="Send answer"
-              className="self-end rounded-lg bg-sandstone-600 p-2.5 text-white hover:bg-sandstone-700 disabled:opacity-40">
-              <Send size={16} />
-            </button>
+              placeholder={!open ? 'Start or ask for the next question first'
+                : dictation.listening ? 'Listening… speak your answer'
+                : 'Answer as you would in the room… (Enter to send, Shift+Enter for a new line)'}
+              className="flex-1 resize-none rounded-lg border border-stone-300 bg-white p-2.5 text-[15px] focus:border-sandstone-500 focus:ring-2 focus:ring-sandstone-500/20 focus:outline-none disabled:bg-stone-50 read-only:bg-stone-50 dark:border-stone-700 dark:bg-stone-950 dark:disabled:bg-stone-900 dark:read-only:bg-stone-900" />
+            <div className="flex flex-col justify-end gap-2">
+              {listenable && (
+                <button onClick={toggleMic} disabled={!open || busy !== null} aria-pressed={dictation.listening}
+                  aria-label={dictation.listening ? 'Stop speaking' : 'Speak your answer'}
+                  className={`rounded-lg p-2.5 disabled:opacity-40 ${dictation.listening
+                    ? 'animate-pulse bg-rose-600 text-white' : 'border border-stone-300 text-stone-600 hover:border-sandstone-500 hover:text-sandstone-600 dark:border-stone-700 dark:text-stone-300'}`}>
+                  {dictation.listening ? <Square size={16} /> : <Mic size={16} />}
+                </button>
+              )}
+              <button onClick={send} disabled={!open || !draft.trim() || busy !== null} aria-label="Send answer"
+                className="rounded-lg bg-sandstone-600 p-2.5 text-white hover:bg-sandstone-700 disabled:opacity-40">
+                <Send size={16} />
+              </button>
+            </div>
           </div>
+          <VoiceStatus speaking={speaking} listening={dictation.listening} locked={locked} error={dictation.error}
+            readOnlyBrowser={voice && !listenable} />
         </footer>
       </section>
     </div>
@@ -173,6 +238,30 @@ function HeaderButton({ onClick, disabled, icon, label }: { onClick: () => void;
       {icon}{label}
     </button>
   )
+}
+
+function VoiceToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+  return (
+    <button onClick={onToggle} aria-pressed={on} title="The board reads each question aloud and you answer by speaking"
+      className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition ${on
+        ? 'bg-sandstone-600 text-white' : 'bg-stone-100 text-stone-500 dark:bg-stone-800'}`}>
+      <Mic size={12} /> Voice
+    </button>
+  )
+}
+
+function VoiceStatus({ speaking, listening, locked, error, readOnlyBrowser }: {
+  speaking: boolean; listening: boolean; locked: boolean; error: string; readOnlyBrowser: boolean
+}) {
+  const cls = 'text-xs text-stone-500'
+  if (error) return <p className="text-xs text-rose-600 dark:text-rose-400">{error}</p>
+  if (speaking) return <p className={cls}>The board is asking…</p>
+  if (listening) {
+    return <p className={cls}>Listening. Your browser turns your speech into text; only the text reaches Dholpur House. Press send when you finish.</p>
+  }
+  if (locked) return <p className={cls}>Exam Mode: as in the room, a spoken answer can't be edited before you send it.</p>
+  if (readOnlyBrowser) return <p className={cls}>This browser can read questions aloud but can't transcribe speech. Type your answer, or use Chrome, Edge or Safari to speak it.</p>
+  return null
 }
 
 function ModeToggle({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => void }) {
@@ -219,7 +308,9 @@ function SourceLine({ t, onOpen }: { t: Turn; onOpen: (id: string, query: string
   )
 }
 
-function BoardBubble({ t, onOpen, coach }: { t: Turn; onOpen: (id: string, query: string) => void; coach: boolean }) {
+function BoardBubble({ t, onOpen, coach, onSpeak }: {
+  t: Turn; onOpen: (id: string, query: string) => void; coach: boolean; onSpeak?: (question: string) => void
+}) {
   const [similar, setSimilar] = useState<SimilarQuestion[] | null>(null)
   const [open, setOpen] = useState(false)
   const toggle = async () => {
@@ -236,6 +327,12 @@ function BoardBubble({ t, onOpen, coach }: { t: Turn; onOpen: (id: string, query
         <p className="text-[15px] leading-relaxed text-stone-900 dark:text-stone-100">{t.question}</p>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <SourceLine t={t} onOpen={onOpen} />
+          {onSpeak && (
+            <button onClick={() => onSpeak(t.question)} aria-label="Read the question aloud"
+              className="inline-flex items-center text-stone-400 hover:text-sandstone-600">
+              <Volume2 size={13} />
+            </button>
+          )}
           {coach && (
             <button onClick={toggle} className="inline-flex items-center gap-1 text-xs text-sandstone-600 hover:underline dark:text-sandstone-400">
               <History size={12} /> {open ? 'Hide' : 'How have boards asked this?'}
