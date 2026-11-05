@@ -130,7 +130,7 @@ def test_generated_question_on_a_news_item_records_the_article(fake_llm, sql):
 def test_good_answers_get_at_most_two_follow_ups(fake_llm):
     fake_llm.json["evaluation"] = evaluation()
     session = new_session()
-    filters = Filters(topics=ETHICS, question_mode="real")
+    filters = Filters(plan="topics", topics=ETHICS, question_mode="real")
     first = session.next_question(filters)
     depths = [session.answer("An answer.", "coach", filters)["next"]["depth"] for _ in range(MAX_FOLLOWUPS + 1)]
     assert depths == [1, 2, 0] and first["depth"] == 0     # follow-up, follow-up, then a new main question
@@ -142,7 +142,7 @@ def test_good_verdict_with_a_low_score_is_downgraded_and_moves_on(fake_llm):
     fake_llm.json["evaluation"] = lambda m: {**evaluation(5)(m), "scores": {**{k: 5 for k in evaluator.SCORE_KEYS},
                                                                             "depth": 2}}
     session = new_session()
-    filters = Filters(topics=ETHICS, question_mode="real")
+    filters = Filters(plan="topics", topics=ETHICS, question_mode="real")
     session.next_question(filters)
     r = session.answer("An answer.", "exam", filters)
     assert r["evaluation"]["verdict"] == "partial" and r["next"]["depth"] == 0 and r["next"]["main_index"] == 2
@@ -151,7 +151,7 @@ def test_good_verdict_with_a_low_score_is_downgraded_and_moves_on(fake_llm):
 def test_weak_answer_moves_on_to_the_next_chosen_topic(fake_llm):
     fake_llm.json["evaluation"] = evaluation(1, "weak", None)
     session = new_session()
-    filters = Filters(topics=["Ethics & Values", "Health", "Not a topic"], question_mode="real")
+    filters = Filters(plan="topics", topics=["Ethics & Values", "Health", "Not a topic"], question_mode="real")
     first = session.next_question(filters)
     nxt = session.answer("Not sure.", "coach", filters)["next"]
     assert (first["topic"], nxt["topic"]) == ("Ethics & Values", "Health")
@@ -159,7 +159,7 @@ def test_weak_answer_moves_on_to_the_next_chosen_topic(fake_llm):
 
 def test_asking_again_skips_the_open_question(fake_llm):
     session = new_session()
-    filters = Filters(topics=ETHICS, question_mode="real")
+    filters = Filters(plan="topics", topics=ETHICS, question_mode="real")
     session.next_question(filters)
     session.next_question(filters)
     first, second = session.turns
@@ -169,15 +169,15 @@ def test_asking_again_skips_the_open_question(fake_llm):
 def test_answer_without_an_open_question():
     session = new_session()
     with pytest.raises(InterviewError, match="no open question"):
-        session.answer("x", "coach", Filters(topics=ETHICS))
+        session.answer("x", "coach", Filters(plan="topics", topics=ETHICS))
 
 
 def test_topic_and_daf_requirements():
     session = new_session()
     with pytest.raises(InterviewError, match="Pick at least one topic"):
-        session.next_question(Filters(topics=["Nope"]))
+        session.next_question(Filters(plan="topics", topics=["Nope"]))
     with pytest.raises(InterviewError, match="Add your DAF"):
-        session.next_question(Filters(topics=["DAF & Background"], daf="  "))
+        session.next_question(Filters(plan="topics", topics=["DAF & Background"], daf="  "))
 
 
 def test_open_resumes_known_sessions_and_replaces_unknown_ones():
@@ -194,7 +194,7 @@ def test_evaluator_sees_the_chain_and_the_news_reference(fake_llm, sql):
     repo.add_turn(session.id, 1, 0, "Economy", "What does the RBI decision mean?",
                   {"type": "generated", "based_on": "news", "title": "RBI holds rates", "publisher": "World",
                    "published_at": "2026-10-12T10:00:00+00:00", "summary": "Repo unchanged."})
-    session.answer("Rates stay to curb inflation.", "coach", Filters(topics=["Economy"]))
+    session.answer("Rates stay to curb inflation.", "coach", Filters(plan="topics", topics=["Economy"]))
     prompt = fake_llm.calls[0]["messages"][0]["content"]
     assert "News item (World, 2026-10-12): RBI holds rates. Repo unchanged." in prompt
     assert "Candidate: Rates stay to curb inflation." in prompt
@@ -208,11 +208,37 @@ def test_context_and_reference_sentences():
     assert _reference([{"source": {"type": "past"}}]) == ""
 
 
+# ---------- full interview ----------
+
+def test_a_full_interview_runs_to_its_length_with_the_board_choosing(fake_llm):
+    fake_llm.json["question"] = written(angle="topic", daf_item=None)
+    session = new_session()
+    filters = Filters(topics=[], daf=DAF, length=10)
+    asked = [session.next_question(filters) for _ in range(10)]
+    assert [t["main_index"] for t in asked] == list(range(1, 11))
+    assert [t["source"]["asked_by"] for t in asked[:2]] == ["Chairperson"] * 2 and asked[0]["topic"] == "DAF & Background"
+    assert asked[-1]["source"]["asked_by"] == "Chairperson"
+    assert {t["source"]["asked_by"] for t in asked[2:-1]} == {"Member 1", "Member 2", "Member 3", "Member 4"}
+
+    fake_llm.json["evaluation"] = evaluation()             # good: the member who asked follows up
+    follow_up = session.answer("An answer.", "exam", filters)["next"]
+    assert follow_up["depth"] == 1 and follow_up["source"] == {"type": "followup", "asked_by": "Chairperson"}
+    fake_llm.json["evaluation"] = evaluation(2, "weak", None)
+    assert session.answer("Not sure.", "exam", filters)["next"] is None   # the last question: the interview is over
+    assert session.next_question(filters) is None
+    assert session.next_question(Filters(topics=[], daf=DAF, length=20))["main_index"] == 11   # longer: it goes on
+
+
+def test_topic_practice_has_no_board_seats(fake_llm):
+    t = new_session().next_question(Filters(plan="topics", topics=ETHICS, question_mode="real"))
+    assert "asked_by" not in t["source"]
+
+
 # ---------- report ----------
 
 def test_report_averages_by_dimension_and_topic(fake_llm):
     session = new_session()
-    filters = Filters(topics=["Ethics & Values", "Health"], question_mode="real")
+    filters = Filters(plan="topics", topics=["Ethics & Values", "Health"], question_mode="real")
     session.next_question(filters)
     fake_llm.json["evaluation"] = evaluation(4, "good", None)
     session.answer("Good answer.", "coach", filters)

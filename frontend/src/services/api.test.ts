@@ -39,11 +39,11 @@ describe('REST calls', () => {
   })
 
   it('posts interview requests with cleaned filters', async () => {
-    const f = { topics: ['Economy'], board: '', daf: '  ', question_mode: 'real' as const }
+    const f = { topics: ['Economy'], board: '', daf: '  ', question_mode: 'real' as const, plan: 'topics' as const, length: 10 as const }
     expect(await api.interviewNext(null, f)).toBe('posted')
     await api.interviewAnswer('s1', 'An answer', 'exam', f)
     expect(http.post.mock.calls[0]).toEqual(['/api/interview/next', { session_id: null,
-      filters: { topics: ['Economy'], board: null, daf: null, question_mode: 'real' } }])
+      filters: { topics: ['Economy'], board: null, daf: null, question_mode: 'real', plan: 'topics', length: 10 } }])
     expect(http.post.mock.calls[1][1]).toMatchObject({ session_id: 's1', answer: 'An answer', mode: 'exam', spoken: false })
     await api.interviewAnswer('s1', 'Spoken', 'coach', f, true)
     expect(http.post.mock.calls[2][1]).toMatchObject({ answer: 'Spoken', spoken: true })
@@ -51,13 +51,13 @@ describe('REST calls', () => {
 
   it('turns API errors into readable messages', async () => {
     http.post.mockRejectedValueOnce({ isAxiosError: true, response: { data: { detail: 'Pick at least one topic' } } })
-    await expect(api.interviewNext(null, { topics: [], board: '', daf: '', question_mode: 'generated' }))
+    await expect(api.interviewNext(null, { topics: [], board: '', daf: '', question_mode: 'generated', plan: 'topics', length: 10 }))
       .rejects.toThrow('Pick at least one topic')
     http.post.mockRejectedValueOnce({ isAxiosError: true, message: 'Network Error', response: { data: { detail: [{ msg: 'bad' }] } } })
-    await expect(api.interviewAnswer('s', 'a', 'coach', { topics: [], board: '', daf: '', question_mode: 'real' }))
+    await expect(api.interviewAnswer('s', 'a', 'coach', { topics: [], board: '', daf: '', question_mode: 'real', plan: 'topics', length: 10 }))
       .rejects.toThrow('[{"msg":"bad"}]')
     http.post.mockRejectedValueOnce('boom')
-    await expect(api.interviewNext(null, { topics: [], board: '', daf: '', question_mode: 'real' })).rejects.toThrow('boom')
+    await expect(api.interviewNext(null, { topics: [], board: '', daf: '', question_mode: 'real', plan: 'topics', length: 10 })).rejects.toThrow('boom')
   })
 })
 

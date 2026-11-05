@@ -13,17 +13,18 @@ import { InterviewFiltersPanel } from './InterviewFiltersPanel'
 
 type Mode = 'coach' | 'exam'
 const STORE = 'upsc-interview'
-const DEFAULT_FILTERS: InterviewFilters = { topics: [], board: '', daf: '', question_mode: 'generated' }
+const DEFAULT_FILTERS: InterviewFilters = { topics: [], board: '', daf: '', question_mode: 'generated', plan: 'full', length: 10 }
 
 interface Saved { sessionId: string | null; mode: Mode; voice: boolean; filters: InterviewFilters }
 
 function load(): Saved {
   try {
     const raw = JSON.parse(localStorage.getItem(STORE) || '{}')
-    return { sessionId: raw.sessionId ?? null, mode: raw.mode ?? 'coach', voice: raw.voice === true,
+    // By default, as close to the room as possible: a full interview, Exam mode, spoken.
+    return { sessionId: raw.sessionId ?? null, mode: raw.mode ?? 'exam', voice: raw.voice ?? true,
              filters: { ...DEFAULT_FILTERS, ...raw.filters } }
   } catch {
-    return { sessionId: null, mode: 'coach', voice: false, filters: DEFAULT_FILTERS }
+    return { sessionId: null, mode: 'exam', voice: true, filters: DEFAULT_FILTERS }
   }
 }
 
@@ -60,7 +61,11 @@ export function InterviewView({ stats, onOpen }: { stats: Stats | null; onOpen: 
   useEffect(() => () => stopSpeaking(), [])
   useEffect(() => { bottom.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }) }, [turns, busy, report])
 
-  const open = [...turns].reverse().find((t) => t.answer === null && !t.evaluation?.skipped)
+  const open = openTurn(turns)
+  const full = filters.plan === 'full'
+  const asked = Math.max(0, ...turns.map((t) => t.main_index))
+  const finished = isFinished(turns, filters)
+  const canAsk = (full || filters.topics.length > 0) && !finished
 
   const quiet = () => { dictation.stop(); stopSpeaking(); setSpeaking(false) }
 
@@ -81,8 +86,13 @@ export function InterviewView({ stats, onOpen }: { stats: Stats | null; onOpen: 
       const sid = await action()
       const fresh = await getInterviewSession(sid)
       setTurns(fresh)
-      const asked = [...fresh].reverse().find((t) => t.answer === null && !t.evaluation?.skipped)
-      if (voiceOn.current && asked) askAloud(asked.question)
+      const next = openTurn(fresh)
+      if (next) {
+        if (voiceOn.current) askAloud(next.question)
+      } else if (isFinished(fresh, filters)) {
+        if (voiceOn.current) speak(CLOSING_WORDS)
+        setReport(await getInterviewReport(sid))
+      }
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -139,7 +149,9 @@ export function InterviewView({ stats, onOpen }: { stats: Stats | null; onOpen: 
               <SlidersHorizontal size={13} /> Filters{filters.topics.length ? ` (${filters.topics.length})` : ''}
             </button>
             <span className="text-sm font-medium">Interview board</span>
-            {filters.topics.length > 0 && <span className="hidden text-xs text-stone-400 sm:inline">{filters.topics.join(' · ')}</span>}
+            {full
+              ? asked > 0 && <span className="text-xs text-stone-400">Question {Math.min(asked, filters.length)} of {filters.length}</span>
+              : filters.topics.length > 0 && <span className="hidden text-xs text-stone-400 sm:inline">{filters.topics.join(' · ')}</span>}
           </div>
           <div className="flex items-center gap-1">
             <HeaderButton onClick={showReport} disabled={!turns.some((t) => t.answer)} icon={<ClipboardList size={14} />} label="Report" />
@@ -150,9 +162,12 @@ export function InterviewView({ stats, onOpen }: { stats: Stats | null; onOpen: 
         <div className="flex-1 space-y-4 overflow-y-auto px-4 py-5">
           {!turns.length && !busy && (
             <div className="mx-auto max-w-md py-12 text-center text-sm text-stone-500">
-              <p className="mb-1 font-medium text-stone-700 dark:text-stone-300">Practise with the board</p>
-              <p className="mb-5">Pick one or more topics on the left, then start. Good answers earn up to two follow-ups; weak ones get critique and a new question.</p>
-              <button onClick={nextQuestion} disabled={!filters.topics.length}
+              <p className="mb-1 font-medium text-stone-700 dark:text-stone-300">{full ? 'Face the board' : 'Practise with the board'}</p>
+              <p className="mb-5">{full
+                ? `A full interview of ${filters.length} questions. The Chairperson opens with your background, four members take their areas, and the Chairperson closes. Add your DAF on the left so they can ask about you.`
+                : 'Pick one or more topics on the left, then start.'}{' '}
+                Good answers earn up to two follow-ups; weak ones get critique and a new question.</p>
+              <button onClick={nextQuestion} disabled={!canAsk}
                 className="inline-flex items-center gap-2 rounded-md bg-sandstone-600 px-4 py-2 text-sm font-medium text-white hover:bg-sandstone-700 disabled:opacity-40">
                 <Play size={14} /> Start
               </button>
@@ -184,6 +199,11 @@ export function InterviewView({ stats, onOpen }: { stats: Stats | null; onOpen: 
               {busy === 'asking' ? 'The board is preparing a question…' : 'The board is evaluating your answer…'}
             </p>
           )}
+          {finished && !busy && (
+            <p className="rounded-lg bg-lawn-50 p-3 text-center text-sm text-stone-700 dark:bg-lawn-500/10 dark:text-stone-300">
+              {CLOSING_WORDS} Your report is below; press New for another interview.
+            </p>
+          )}
           {error && <p className="rounded-md bg-rose-50 p-3 text-sm text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">{error}</p>}
           {report && <ReportCard r={report} />}
           <div ref={bottom} />
@@ -195,7 +215,7 @@ export function InterviewView({ stats, onOpen }: { stats: Stats | null; onOpen: 
               <ModeToggle mode={mode} onChange={setMode} />
               {(canSpeak() || listenable) && <VoiceToggle on={voice} onToggle={toggleVoice} />}
             </div>
-            <button onClick={nextQuestion} disabled={busy !== null || !filters.topics.length}
+            <button onClick={nextQuestion} disabled={busy !== null || !canAsk}
               className="inline-flex items-center gap-1 text-xs text-stone-500 hover:text-sandstone-600 disabled:opacity-40">
               <SkipForward size={13} /> {turns.length ? 'Next question' : 'Start'}
             </button>
@@ -229,6 +249,15 @@ export function InterviewView({ stats, onOpen }: { stats: Stats | null; onOpen: 
       </section>
     </div>
   )
+}
+
+const CLOSING_WORDS = 'Thank you. That will be all; the interview is over.'
+
+const openTurn = (turns: Turn[]) => [...turns].reverse().find((t) => t.answer === null && !t.evaluation?.skipped)
+
+/** A full interview is over once its last main question is answered or skipped. */
+function isFinished(turns: Turn[], f: InterviewFilters): boolean {
+  return f.plan === 'full' && !openTurn(turns) && turns.some((t) => t.main_index >= f.length)
 }
 
 function HeaderButton({ onClick, disabled, icon, label }: { onClick: () => void; disabled: boolean; icon: React.ReactNode; label: string }) {
@@ -308,6 +337,13 @@ function SourceLine({ t, onOpen }: { t: Turn; onOpen: (id: string, query: string
   )
 }
 
+/** The avatar: who is asking (C, M1…M4) in a full interview, else Q for a question and F for a follow-up. */
+function seat(t: Turn): string {
+  const who = t.source.asked_by
+  if (who) return who === 'Chairperson' ? 'C' : who.replace('Member ', 'M')
+  return t.depth ? 'F' : 'Q'
+}
+
 function BoardBubble({ t, onOpen, coach, onSpeak }: {
   t: Turn; onOpen: (id: string, query: string) => void; coach: boolean; onSpeak?: (question: string) => void
 }) {
@@ -319,11 +355,14 @@ function BoardBubble({ t, onOpen, coach, onSpeak }: {
   }
   return (
     <div className="flex gap-2.5">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sandstone-100 text-xs font-semibold text-sandstone-700 dark:bg-sandstone-500/20 dark:text-sandstone-300">
-        {t.depth ? 'F' : 'Q'}
+      <div title={t.source.asked_by}
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sandstone-100 text-xs font-semibold text-sandstone-700 dark:bg-sandstone-500/20 dark:text-sandstone-300">
+        {seat(t)}
       </div>
       <div className="min-w-0 space-y-1">
-        <div className="text-xs font-medium text-sandstone-700 dark:text-sandstone-300">{t.topic}</div>
+        <div className="text-xs font-medium text-sandstone-700 dark:text-sandstone-300">
+          {t.source.asked_by ? `${t.source.asked_by} · ` : ''}{t.topic}
+        </div>
         <p className="text-[15px] leading-relaxed text-stone-900 dark:text-stone-100">{t.question}</p>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <SourceLine t={t} onOpen={onOpen} />

@@ -68,7 +68,7 @@ def test_ask_uses_the_injected_retriever(client):
 def test_interview_flow(client, fake_llm):
     topics = {t["name"]: t for t in client.get("/api/interview/topics").json()}
     assert topics["Health"]["past_questions"] >= 1 and topics["DAF & Background"]["needs_daf"]
-    filters = {"topics": ["Ethics & Values"], "question_mode": "real"}
+    filters = {"plan": "topics", "topics": ["Ethics & Values"], "question_mode": "real"}
     first = client.post("/api/interview/next", json={"filters": filters}).json()
     sid = first["session_id"]
     fake_llm.json["evaluation"] = lambda m: {
@@ -88,19 +88,33 @@ def test_interview_flow(client, fake_llm):
 
 
 def test_interview_errors(client, fake_llm):
-    r = client.post("/api/interview/next", json={"filters": {"topics": []}})
+    r = client.post("/api/interview/next", json={"filters": {"plan": "topics", "topics": []}})
     assert r.status_code == 400 and r.json()["detail"] == "Pick at least one topic to be asked about"
-    sid = client.post("/api/interview/next", json={"filters": {"topics": ["Health"], "question_mode": "real"}}
+    sid = client.post("/api/interview/next", json={"filters": {"plan": "topics", "topics": ["Health"], "question_mode": "real"}}
                       ).json()["session_id"]
     fake_llm.error = ProviderError("bad JSON")
-    r = client.post("/api/interview/answer", json={"session_id": sid, "answer": "x", "filters": {"topics": ["Health"]}})
+    r = client.post("/api/interview/answer", json={"session_id": sid, "answer": "x", "filters": {"plan": "topics", "topics": ["Health"]}})
     assert r.status_code == 502 and r.json()["detail"] == "The AI model failed: bad JSON"
     fake_llm.error = ConfigError("No API key")
-    r = client.post("/api/interview/next", json={"session_id": sid, "filters": {"topics": ["Health"]}})
+    r = client.post("/api/interview/next", json={"session_id": sid, "filters": {"plan": "topics", "topics": ["Health"]}})
     assert r.status_code == 500 and r.json()["detail"] == "No API key"
     assert client.get("/api/interview/sessions/00000000-0000-0000-0000-000000000000/report").status_code == 404
     assert client.get("/api/interview/turns/999999/similar").status_code == 404
     assert client.post("/api/interview/answer", json={"session_id": sid, "answer": "", "filters": {}}).status_code == 422
+    assert client.post("/api/interview/next", json={"filters": {"length": 15}}).status_code == 422
+
+
+def test_a_full_interview_ends_with_no_next_question(client, fake_llm):
+    fake_llm.json["question"] = lambda m: {"question": "Why civil services?", "angle": "topic", "daf_item": None,
+                                           "based_on": "the topic", "article_url": None}
+    body = {"filters": {"question_mode": "generated"}}       # the defaults: a full, 10-question interview
+    r = client.post("/api/interview/next", json=body).json()
+    assert r["turn"]["source"]["asked_by"] == "Chairperson"
+    for _ in range(9):
+        r = client.post("/api/interview/next", json={"session_id": r["session_id"], **body}).json()
+    assert r["turn"]["main_index"] == 10
+    done = client.post("/api/interview/next", json={"session_id": r["session_id"], **body}).json()
+    assert done == {"session_id": r["session_id"], "turn": None}
 
 
 # ---------- admin ----------
@@ -174,7 +188,7 @@ def test_ai_endpoints_are_rate_limited_per_visitor(client, fake_llm):
     limiter = RateLimiter(per_minute=2, per_day=100, daily_budget=100)
     client.app.dependency_overrides[get_rate_limiter] = lambda: limiter
     me = {"X-Real-IP": "203.0.113.7"}
-    body = {"filters": {"topics": ["Health"], "question_mode": "real"}}
+    body = {"filters": {"plan": "topics", "topics": ["Health"], "question_mode": "real"}}
     assert client.post("/api/interview/next", json=body, headers=me).status_code == 200
     assert client.post("/api/ask", json={"question": "anything"}, headers=me).status_code == 200
     r = client.post("/api/interview/next", json=body, headers=me)
