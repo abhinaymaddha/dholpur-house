@@ -49,6 +49,16 @@ def test_take_waits_for_a_question_still_being_written():
         assert work.take(sid, ("a",)) == "written"
 
 
+def test_take_gives_up_after_waiting():
+    release = Event()
+    with ThreadPoolExecutor(1) as pool:
+        work, sid = BackgroundWork(pool), uuid4()
+        work.prepare(sid, ("a",), lambda: release.wait(5))
+        assert work.take(sid, ("a",), wait=0.01) is None
+        release.set()
+        assert work.take(sid, ("a",)) is None                       # dropped, not handed over later
+
+
 def test_abandoned_preparations_are_dropped_oldest_first():
     pool = DeferredExecutor()
     work = BackgroundWork(pool, keep=2)

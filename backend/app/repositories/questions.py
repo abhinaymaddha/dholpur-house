@@ -13,6 +13,18 @@ ASKABLE = (r"q.text ~* '(\?\s*$|^\s*(what|why|how|who|whom|when|where|which|is|a
            # stand-alone: at least five words, so it isn't a fragment that only makes sense after another question
            r" AND array_length(regexp_split_to_array(trim(q.text), '\s+'), 1) >= 5")
 
+# Stricter, for a real question asked in place of a written one: reads well aloud and makes sense to anyone. One
+# complete English question, without a candidate's notes, references to what came before, or another candidate's
+# personal details.
+CLEAN = (r"q.text ~ '^[A-Z][^?]{15,180}\?\s*$' AND q.text !~ '[()\[\]:;\"]' AND q.text !~ '[^\x00-\x7F]'"
+         r" AND q.text !~* '\m(i|my|we|sir|mam|madam|he|she|his|her|him|it|its|this|that|these|those|they|them|their|"
+         r"such|above|same|then|also|else|another|other|more|again|there|here|your|did you|have you|when you|xx)\M'"
+         r" AND q.text !~* '\m(kya|kaise|kaisa|hai|hain|kyun|kyu|aap|aapne|aapka|kaun|nahi|nhi|kis|ki|ka|ke|ko|se|ho|"
+         r"tha|thi|mein|mai|tum|yeh|ye)\M'"
+         r" AND q.text ~* '^\s*(what|why|how|who|which|when|where|is|are|do|does|can|could|should|would|will|has|tell|"
+         r"explain)\M'"
+         r" AND array_length(regexp_split_to_array(trim(q.text), '\s+'), 1) >= 5")
+
 COLS = ("q.id, q.text, q.member, q.transcript_id, t.board, t.cse_year, t.alias, t.daf, "
         "(SELECT f.text FROM questions f WHERE f.prev_id = q.id LIMIT 1) AS follow_up")
 
@@ -20,7 +32,7 @@ COLS = ("q.id, q.text, q.member, q.transcript_id, t.board, t.cse_year, t.alias, 
 class QuestionRepository(Repository):
 
     def nearest(self, vec, limit: int, *, board: str | None = None, exclude_ids: list[int] = (),
-                exclude_transcript: str | None = None, askable: bool = False) -> list[dict]:
+                exclude_transcript: str | None = None, askable: bool = False, clean: bool = False) -> list[dict]:
         """Questions closest in meaning to `vec` (with the follow-up asked next), closest first."""
         clauses = ["q.embedding IS NOT NULL", "length(q.text) BETWEEN 20 AND 300",
                    "NOT (q.id = ANY(%(exclude)s::bigint[]))"]
@@ -30,6 +42,8 @@ class QuestionRepository(Repository):
             clauses.append("t.board = %(board)s")
         if askable:
             clauses.append(ASKABLE)
+        if clean:
+            clauses.append(CLEAN)
         params = {"v": vec, "limit": limit, "exclude": list(exclude_ids), "tx": exclude_transcript, "board": board}
         with self._pool.connection() as conn:
             conn.execute("SET hnsw.ef_search = 100")

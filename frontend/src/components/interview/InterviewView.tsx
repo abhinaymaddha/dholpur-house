@@ -327,6 +327,7 @@ function SourceLine({ t, onOpen }: { t: Turn; onOpen: (id: string, query: string
   const s = t.source
   const cls = 'text-xs text-stone-400'
   if (s.type === 'followup') return <span className={cls}>Follow-up {t.depth} of 2</span>
+  if (s.type === 'opening') return <span className={cls}>The board's opening question</span>
   if (s.type === 'generated') {
     const label = `New question · ${s.angle === 'news' ? 'from the news' : s.angle === 'daf' ? 'from your DAF' : 'on the topic'}${s.based_on ? `: ${s.based_on}` : ''}`
     return s.url ? (

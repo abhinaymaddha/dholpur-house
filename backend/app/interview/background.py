@@ -36,15 +36,18 @@ class BackgroundWork:
             while len(self._prepared) > self._keep:
                 self._prepared.popitem(last=False)
 
-    def take(self, session_id: UUID, key: tuple) -> object | None:
-        """The prepared question for this key, waiting if it is still being written. None means write it now:
-        nothing was prepared, the candidate changed their choices since, or the writing failed."""
+    def take(self, session_id: UUID, key: tuple, wait: float | None = None) -> object | None:
+        """The prepared question for this key, waiting up to `wait` seconds if it is still being written. None means
+        there is none to ask: nothing was prepared, the candidate changed their choices since, it isn't ready in
+        time (it is then dropped), or the writing failed."""
         with self._lock:
             entry = self._prepared.pop(session_id, None)
         if not entry or entry[0] != key:
             return None
         try:
-            return entry[1].result()
+            return entry[1].result(timeout=wait)
+        except TimeoutError:
+            return None
         except Exception as e:
             logger.warning("Preparing a question failed: %s", e)
             return None

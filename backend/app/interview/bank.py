@@ -45,7 +45,7 @@ class QuestionBank:
         self.embed = embedder
 
     def similar(self, queries: list[str], n: int = 12, board: str | None = None, exclude_ids: list[int] = (),
-                exclude_transcript: str | None = None, askable: bool = False) -> list[dict]:
+                exclude_transcript: str | None = None, askable: bool = False, clean: bool = False) -> list[dict]:
         """Past questions closest in meaning to any of the query texts, best first, de-duplicated.
 
         With a board, part of each query's results comes from that board so its style shows through.
@@ -58,9 +58,9 @@ class QuestionBank:
             rows = []
             if board:
                 rows += self.repo.nearest(vec, per_query // 2 + 1, board=board, exclude_ids=exclude_ids,
-                                          exclude_transcript=exclude_transcript, askable=askable)
+                                          exclude_transcript=exclude_transcript, askable=askable, clean=clean)
             rows += self.repo.nearest(vec, per_query, exclude_ids=exclude_ids,
-                                      exclude_transcript=exclude_transcript, askable=askable)
+                                      exclude_transcript=exclude_transcript, askable=askable, clean=clean)
             for r in rows:
                 if r["id"] not in found or r["distance"] < found[r["id"]]["distance"]:
                     found[r["id"]] = r

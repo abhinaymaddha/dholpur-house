@@ -1,7 +1,8 @@
 """Where the next main question comes from: a QuestionSource strategy.
 
 GeneratedQuestionSource writes a new question with model_2 (topic + DAF + news + similar real
-questions); RealQuestionSource asks a real past question chosen by meaning, with no LLM call.
+questions); RealQuestionSource asks a real past question chosen by meaning, with no LLM call;
+OpeningQuestionSource asks one of a few ready-made openers, so a full interview starts at once.
 """
 
 from __future__ import annotations
@@ -47,6 +48,18 @@ ANGLES = {
     "daf_admin": "Take ONE DAF item not covered yet and ask how it would matter in their work as an officer, or what "
                  "they would do about a real issue in their home district or state.",
 }
+
+
+OPENERS = [
+    "Please introduce yourself and tell us a little about your background.",
+    "Tell us about yourself: where you come from, what you studied and what you have been doing lately.",
+    "Walk us through your journey so far, and how it brought you to this interview.",
+    "Why do you want to join the civil services?",
+    "What made you choose the civil services over the other careers open to you?",
+    "Before we begin, tell us what you have been doing since your written examination.",
+    "If you had to describe yourself in a few sentences, what would you say?",
+    "What has shaped you most as a person, and why?",
+]
 
 
 def daf_items(daf: str) -> list[str]:
@@ -104,14 +117,26 @@ class QuestionSource(ABC):
         return queries
 
 
+class OpeningQuestionSource(QuestionSource):
+    """How boards usually begin. Ready-made, so the candidate isn't kept waiting at the very start."""
+
+    def next(self, ctx: QuestionContext) -> tuple[str, dict]:
+        return self.rng.choice(OPENERS), {"type": "opening"}
+
+
 class RealQuestionSource(QuestionSource):
-    """A real past question, chosen by meaning from the closest matches; no LLM call."""
+    """A real past question, chosen by meaning from the closest matches; no LLM call. With `clean`, only those
+    that read well aloud and make sense to anyone, for asking in place of a question that isn't ready."""
 
     pool_size = 12
 
+    def __init__(self, bank: QuestionBank, rng: random.Random | None = None, clean: bool = False):
+        super().__init__(bank, rng)
+        self.clean = clean
+
     def next(self, ctx: QuestionContext) -> tuple[str, dict]:
         closest = self.bank.similar(self.queries(ctx), n=25, board=ctx.board, exclude_ids=ctx.used_question_ids,
-                                    askable=True)
+                                    askable=True, clean=self.clean)
         if not closest:
             raise InterviewError(f"No past questions found for {ctx.topic.name}")
         q = self.rng.choice(closest[:self.pool_size])   # some variety among the closest matches
