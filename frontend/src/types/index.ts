@@ -117,6 +117,8 @@ export interface InterviewFilters {
   board: string
   daf: string
   question_mode: 'generated' | 'real'
+  plan: 'full' | 'topics'   // full: the board picks the topics, as in the real interview
+  length: 10 | 20 | 30      // main questions in a full interview
 }
 
 export interface SimilarQuestion {
@@ -167,6 +169,7 @@ export interface Turn {
     publisher?: string
     published_at?: string
     daf_item?: string
+    asked_by?: string   // full interview: Chairperson, Member 1…4
   }
   answer: string | null
   evaluation: Evaluation | null

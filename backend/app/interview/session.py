@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from app.errors import InterviewError
-from app.interview import evaluator, prompts
+from app.interview import board, evaluator, prompts
 from app.interview.bank import QuestionBank
 from app.interview.questions import QuestionContext, QuestionSource
 from app.repositories import InterviewRepository
@@ -26,6 +26,8 @@ class Filters:
     board: str | None = None
     daf: str | None = None
     question_mode: str = "generated"   # or "real": past questions only
+    plan: str = "full"                 # the board picks the topics; or "topics": the candidate's chosen topics
+    length: int = 10                   # main questions in a full interview
 
 
 def _open(turn: dict) -> bool:
@@ -47,6 +49,11 @@ def _reference(chain: list[dict]) -> str:
     if src.get("title"):
         return f"- News item ({src.get('publisher')}, {src.get('published_at', '')[:10]}): {src['title']}. {src.get('summary', '')}"
     return ""
+
+
+def _member(src: dict) -> dict:
+    """A follow-up comes from the board member who asked the main question."""
+    return {"asked_by": src["asked_by"]} if src.get("asked_by") else {}
 
 
 class InterviewSession:
@@ -81,19 +88,29 @@ class InterviewSession:
             raise InterviewError("Pick at least one topic to be asked about")
         return all_topics[valid[(main_index - 1) % len(valid)]]   # rotate through the chosen topics
 
-    def next_question(self, filters: Filters) -> dict:
-        """Ask the next main question with the current filters. An unanswered question is marked skipped."""
+    def next_question(self, filters: Filters) -> dict | None:
+        """Ask the next main question with the current filters; None once a full interview is over.
+        An unanswered question is marked skipped."""
         turns = self.turns
         for t in turns:
             if _open(t):
                 self.repo.mark_skipped(t["id"])
         main_index = max((t["main_index"] for t in turns), default=0) + 1
-        topic = self.pick_topic(filters.topics, main_index)
         daf = (filters.daf or "").strip() or None
+        member = None
+        if filters.plan == "full":
+            if main_index > filters.length:
+                return None
+            slot = board.plan(filters.length, str(self.id), self.bank.topic_counts(), bool(daf))[main_index - 1]
+            topic, member = prompts.topics()[slot.topic], slot.member
+        else:
+            topic = self.pick_topic(filters.topics, main_index)
         if topic.needs_daf and not daf:
             raise InterviewError("Add your DAF details in the filters to be asked DAF-based questions")
         source = self.sources["real" if filters.question_mode == "real" else "generated"]
         question, src = source.next(QuestionContext(topic=topic, board=filters.board, daf=daf, turns=turns))
+        if member:
+            src = {**src, "asked_by": member}
         return self.repo.add_turn(self.id, main_index, 0, topic.name, question, src)
 
     def answer(self, text: str, mode: str, filters: Filters, spoken: bool = False) -> dict:
@@ -115,7 +132,7 @@ class InterviewSession:
         self.repo.save_answer(pending["id"], text, evaluation, mode)
         if evaluation["verdict"] == "good" and followups_left > 0 and follow_up:
             nxt = self.repo.add_turn(self.id, pending["main_index"], pending["depth"] + 1, pending["topic"],
-                                     follow_up, {"type": "followup"})
+                                     follow_up, {"type": "followup", **_member(pending["source"])})
         else:
             nxt = self.next_question(filters)
         return {"evaluation": evaluation, "next": nxt}

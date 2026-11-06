@@ -2,6 +2,8 @@ import { Newspaper } from 'lucide-react'
 import type { Dispatch, SetStateAction } from 'react'
 import type { InterviewFilters, InterviewTopic, Stats } from '../../types'
 
+const LENGTHS = [[10, 'Short'], [20, 'Standard'], [30, 'Long']] as const
+
 const GROUPS: { label: string; hint: string; match: (t: InterviewTopic) => boolean }[] = [
   { label: 'With current affairs', hint: 'Questions also draw on recent news', match: (t) => t.news },
   { label: 'Interview topics', hint: 'Grounded in how past boards asked', match: (t) => !t.news && !t.needs_daf },
@@ -20,12 +22,31 @@ export function InterviewFiltersPanel({ topics, stats, filters, onChange }: {
   const toggle = (name: string) => onChange((f) => ({
     ...f, topics: f.topics.includes(name) ? f.topics.filter((t) => t !== name) : [...f.topics, name],
   }))
-  const dafChosen = filters.topics.includes('DAF & Background')
+  const full = filters.plan === 'full'
+  const dafChosen = !full && filters.topics.includes('DAF & Background')
 
   return (
     <div className="space-y-5 text-sm">
       <p className="text-xs text-stone-500 dark:text-stone-400">Changes apply from the next question.</p>
-      {GROUPS.map((g) => {
+
+      <section>
+        <h3 className="mb-2 text-xs font-semibold tracking-wide text-stone-500 uppercase dark:text-stone-400">Interview</h3>
+        <Segmented value={filters.plan} onChange={(plan) => set({ plan })}
+          options={[['full', 'Full interview'], ['topics', 'Practise topics']]} />
+        <p className="mt-1 text-xs text-stone-400">
+          {full ? 'The Chairperson and four members choose the questions, as in the real interview.'
+            : 'Only the topics you pick, in turn.'}
+        </p>
+        {full && (
+          <div className="mt-3">
+            <Segmented value={filters.length} onChange={(length) => set({ length })}
+              options={LENGTHS.map(([n, label]) => [n, `${label} · ${n}`] as const)} label="Length" />
+            <p className="mt-1 text-xs text-stone-400">Main questions; a good answer can also earn follow-ups.</p>
+          </div>
+        )}
+      </section>
+
+      {!full && GROUPS.map((g) => {
         const items = topics.filter(g.match)
         if (!items.length) return null
         return (
@@ -53,14 +74,8 @@ export function InterviewFiltersPanel({ topics, stats, filters, onChange }: {
 
       <section>
         <h3 className="mb-2 text-xs font-semibold tracking-wide text-stone-500 uppercase dark:text-stone-400">Questions</h3>
-        <div className="flex rounded-md border border-stone-200 p-0.5 text-xs dark:border-stone-700">
-          {([['generated', 'Generate new questions'], ['real', 'Real past questions only']] as const).map(([v, label]) => (
-            <button key={v} onClick={() => set({ question_mode: v })}
-              className={`flex-1 rounded px-2 py-1 ${filters.question_mode === v ? 'bg-sandstone-600 text-stone-50' : 'text-stone-600 dark:text-stone-400'}`}>
-              {label}
-            </button>
-          ))}
-        </div>
+        <Segmented value={filters.question_mode} onChange={(question_mode) => set({ question_mode })}
+          options={[['generated', 'Generate new questions'], ['real', 'Real past questions only']]} />
         <p className="mt-1 text-xs text-stone-400">
           {filters.question_mode === 'generated'
             ? 'New questions written from your DAF, recent news and similar real questions.'
@@ -87,8 +102,26 @@ export function InterviewFiltersPanel({ topics, stats, filters, onChange }: {
             ? 'border-brass-400' : 'border-stone-300 dark:border-stone-700'}`} />
         {dafChosen && !filters.daf.trim()
           ? <p className="text-xs text-brass-600">Needed for “Your DAF” questions.</p>
-          : <p className="text-xs text-stone-400">Personalises questions and finds candidates with a profile like yours.</p>}
+          : <p className="text-xs text-stone-400">
+              {full && !filters.daf.trim() ? 'Without it, the board opens with general questions about you. '
+                : ''}Personalises questions and finds candidates with a profile like yours.
+            </p>}
       </section>
+    </div>
+  )
+}
+
+function Segmented<T extends string | number>({ value, onChange, options, label }: {
+  value: T; onChange: (v: T) => void; options: readonly (readonly [T, string])[]; label?: string
+}) {
+  return (
+    <div role="radiogroup" aria-label={label} className="flex rounded-md border border-stone-200 p-0.5 text-xs dark:border-stone-700">
+      {options.map(([v, text]) => (
+        <button key={v} role="radio" aria-checked={value === v} onClick={() => onChange(v)}
+          className={`flex-1 rounded px-2 py-1 ${value === v ? 'bg-sandstone-600 text-stone-50' : 'text-stone-600 dark:text-stone-400'}`}>
+          {text}
+        </button>
+      ))}
     </div>
   )
 }

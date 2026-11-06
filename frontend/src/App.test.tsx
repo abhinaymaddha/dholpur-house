@@ -39,7 +39,7 @@ it('switches tabs by hash, opens a transcript, toggles the theme and shows the d
 
   window.location.hash = '#interview'
   window.dispatchEvent(new HashChangeEvent('hashchange'))
-  expect(await screen.findByText('Practise with the board')).toBeInTheDocument()
+  expect(await screen.findByText('Face the board')).toBeInTheDocument()
   expect(screen.getByRole('link', { name: 'Interview' })).toHaveAttribute('aria-current', 'page')
 
   window.location.hash = '#ask'

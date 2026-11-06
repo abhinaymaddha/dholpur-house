@@ -17,11 +17,15 @@ questions you, listens, and critiques your answers.
   transcript opens in a clean reader that separates the Chairperson's and each member's questions.
 - **Ask AI.** Ask a question such as *"What do boards ask engineers about rural postings?"* and get an answer
   drawn from the transcripts matching your search and filters, with citations you can open.
-- **Interview.** Pick topics, add your DAF details, and practise with an AI board. It writes new questions from
-  your background, recent news and the most similar real questions from past interviews, or asks real past
-  questions only. Every answer gets a critical, specific evaluation; a good answer earns up to two follow-ups.
-  Coach mode gives feedback after each answer; Exam mode saves it for a report at the end.
-- **Voice.** Turn on Voice in Interview mode and the board reads each question aloud, then listens while you
+- **Interview.** Face an AI board in a full interview, as in the room: you don't pick topics. The Chairperson
+  opens with your background, four members each take an area (interests, current affairs, polity and governance,
+  the economy and environment), and the Chairperson closes with a situational question, drawing topics about as
+  often as real boards ask them. Short (10 questions, the default), standard (20) or long (30); or practise only
+  the topics you pick. Questions are written from your DAF, recent news and the most similar real questions from
+  past interviews, or are real past questions only. Every answer gets a critical, specific evaluation; a good
+  answer earns up to two follow-ups. Exam mode (the default) saves feedback for the report at the end; Coach
+  mode gives it after each answer.
+- **Voice.** On by default: the board reads each question aloud, then listens while you
   answer out loud, as in the real interview. In Exam mode a spoken answer can't be edited before you send it.
   It uses your browser's built-in speech features: Chrome, Edge and Safari can transcribe; in other browsers
   questions are still read aloud and you type your answer.

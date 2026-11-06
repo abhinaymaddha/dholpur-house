@@ -95,7 +95,8 @@ Each topic is a file in `backend/app/interview/prompts/topics/`. Its header says
 current affairs (`news: yes`) or needs the candidate's DAF (`daf: required`); the body is the guidance the
 question writer and the evaluator see. `question.md`, `question_daf.md` and `evaluate.md` are the templates.
 Prompt files are read on every call, so you can edit and retry without restarting. The follow-up rules are in
-`app/interview/session.py`.
+`app/interview/session.py`. How a full interview runs (who asks, which areas each board member covers, how
+topics are weighted) is in `app/interview/board.py`; a new topic should be added to a member's area there.
 
 ### Adding an AI provider
 

@@ -94,7 +94,8 @@ export async function ask(question: string, filters: Filters, q: string, handler
 // ---------- Interview mode ----------
 
 function interviewBody(f: InterviewFilters) {
-  return { topics: f.topics, board: f.board || null, daf: f.daf.trim() || null, question_mode: f.question_mode }
+  return { topics: f.topics, board: f.board || null, daf: f.daf.trim() || null, question_mode: f.question_mode,
+           plan: f.plan, length: f.length }
 }
 
 /** Interview calls can fail with a readable reason (no topic picked, model error, ...). */
@@ -107,7 +108,10 @@ export async function getInterviewTopics(): Promise<InterviewTopic[]> {
   return (await http.get<InterviewTopic[]>('/api/interview/topics')).data
 }
 
-export async function interviewNext(sessionId: string | null, filters: InterviewFilters): Promise<{ session_id: string; turn: Turn }> {
+/** `turn` is null once a full interview is over. */
+export async function interviewNext(
+  sessionId: string | null, filters: InterviewFilters,
+): Promise<{ session_id: string; turn: Turn | null }> {
   try {
     return (await http.post('/api/interview/next', { session_id: sessionId, filters: interviewBody(filters) })).data
   } catch (e) { throw detail(e) }
@@ -115,7 +119,7 @@ export async function interviewNext(sessionId: string | null, filters: Interview
 
 export async function interviewAnswer(
   sessionId: string, answer: string, mode: 'coach' | 'exam', filters: InterviewFilters, spoken = false,
-): Promise<{ evaluation: Evaluation; next: Turn }> {
+): Promise<{ evaluation: Evaluation; next: Turn | null }> {
   try {
     return (await http.post('/api/interview/answer',
       { session_id: sessionId, answer, mode, spoken, filters: interviewBody(filters) })).data

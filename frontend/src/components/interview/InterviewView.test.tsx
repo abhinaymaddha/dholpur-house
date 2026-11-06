@@ -16,6 +16,8 @@ const m = vi.mocked(api)
 let turns: Turn[]
 beforeEach(() => {
   turns = []
+  // These tests practise chosen topics in Coach mode; the full-interview defaults have their own tests below.
+  localStorage.setItem('upsc-interview', JSON.stringify({ mode: 'coach', voice: false, filters: { plan: 'topics' } }))
   m.getInterviewTopics.mockReset().mockResolvedValue(topics)
   m.getInterviewSession.mockReset().mockImplementation(async () => turns)
   m.interviewNext.mockReset().mockImplementation(async () => {
@@ -115,7 +117,7 @@ it('forgets a session the server no longer has, and survives broken storage', as
   localStorage.setItem('upsc-interview', '{not json')
   m.getInterviewTopics.mockRejectedValue(new Error('down'))
   render(<InterviewView stats={null} onOpen={() => {}} />)
-  expect(await screen.findByText('Practise with the board')).toBeInTheDocument()
+  expect(await screen.findByText('Face the board')).toBeInTheDocument()
 
   localStorage.setItem('upsc-interview', JSON.stringify({ sessionId: 'gone' }))
   m.getInterviewSession.mockRejectedValue(new Error('404'))
@@ -246,7 +248,53 @@ describe('voice mode', () => {
   it('has no voice controls where the browser has no speech support', async () => {
     localStorage.setItem('upsc-interview', JSON.stringify({ voice: true }))
     render(<InterviewView stats={stats} onOpen={() => {}} />)
-    await screen.findByText('Practise with the board')
+    await screen.findByText('Face the board')
     expect(screen.queryByRole('button', { name: /Voice/ })).not.toBeInTheDocument()
+  })
+})
+
+describe('full interview', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  const asked = (n: number, by: string) => turn({ id: n, main_index: n, question: `Question ${n}?`,
+    source: { type: 'past', asked_by: by, transcript_id: 'u1', board: 'B', cse_year: 2024 } })
+
+  it('starts without topics, in Exam mode with voice, and ends with thanks and the report', async () => {
+    localStorage.clear()
+    const speech = installSpeech()
+    const next = [asked(1, 'Chairperson'), asked(10, 'Member 2')]
+    m.interviewNext.mockImplementation(async () => {
+      turns = [...turns.map((t) => ({ ...t, evaluation: { skipped: true } as never })), next.shift()!]
+      return { session_id: 's1', turn: turns[turns.length - 1] }
+    })
+    render(<InterviewView stats={stats} onOpen={() => {}} />)
+    expect(await screen.findByText('Face the board')).toBeInTheDocument()
+    expect(screen.getByText(/A full interview of 10 questions/)).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Exam Mode' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('button', { name: /Voice/ })).toHaveAttribute('aria-pressed', 'true')
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Start' })[0])
+    expect(await screen.findByText('Question 1?')).toBeInTheDocument()
+    expect(screen.getByText('Chairperson · Economy')).toBeInTheDocument()
+    expect(screen.getByTitle('Chairperson')).toHaveTextContent('C')
+    expect(screen.getByText('Question 1 of 10')).toBeInTheDocument()
+    expect(speech.spoken()).toEqual(['Question 1?'])
+
+    await userEvent.click(screen.getByRole('button', { name: /Next question/ }))
+    expect(await screen.findByText('Question 10?')).toBeInTheDocument()
+    expect(screen.getByTitle('Member 2')).toHaveTextContent('M2')
+    expect(screen.getByText('Question 10 of 10')).toBeInTheDocument()
+
+    m.interviewAnswer.mockImplementation(async () => {
+      turns = [turns[0], { ...turns[1], answer: 'My answer', mode: 'exam', evaluation: evaluation() }]
+      return { evaluation: evaluation(), next: null }
+    })
+    m.getInterviewReport.mockResolvedValue({ answered: 1, skipped: 1, average: 3, verdicts: { good: 0, partial: 1, weak: 0 },
+      dimensions: {}, topics: [], turns: [] })
+    await userEvent.type(screen.getByLabelText('Your answer'), 'My answer{Enter}')
+    expect(await screen.findByText(/That will be all; the interview is over\. Your report is below/)).toBeInTheDocument()
+    expect(await screen.findByText(/1 answered · 1 skipped/)).toBeInTheDocument()
+    expect(speech.spoken()).toContain('Thank you. That will be all; the interview is over.')
+    expect(screen.getByRole('button', { name: /Next question/ })).toBeDisabled()
   })
 })

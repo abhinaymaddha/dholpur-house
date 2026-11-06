@@ -9,6 +9,8 @@ class InterviewFilters(BaseModel):
     board: str | None = None
     daf: str | None = Field(default=None, max_length=2000)
     question_mode: Literal["generated", "real"] = "generated"   # real = past questions only, no LLM call
+    plan: Literal["full", "topics"] = "full"   # full = the board picks the topics, as in the real interview
+    length: Literal[10, 20, 30] = 10           # main questions in a full interview
 
 
 class NextRequest(BaseModel):
@@ -38,12 +40,12 @@ class Turn(BaseModel):
 
 class NextResponse(BaseModel):
     session_id: UUID
-    turn: Turn
+    turn: Turn | None          # None: the full interview is over
 
 
 class AnswerResponse(BaseModel):
     evaluation: dict[str, Any]
-    next: Turn
+    next: Turn | None          # None: the full interview is over
 
 
 class TopicInfo(BaseModel):

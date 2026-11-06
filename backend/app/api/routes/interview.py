@@ -22,7 +22,8 @@ router = APIRouter(prefix="/api/interview", tags=["interview"])
 
 
 def _filters(f: InterviewFilters) -> Filters:
-    return Filters(topics=f.topics, board=f.board, daf=f.daf, question_mode=f.question_mode)
+    return Filters(topics=f.topics, board=f.board, daf=f.daf, question_mode=f.question_mode, plan=f.plan,
+                   length=f.length)
 
 
 class SessionFactory:
