@@ -25,3 +25,19 @@ def test_topic_file_without_header(tmp_path, monkeypatch):
     monkeypatch.setattr(prompts, "PROMPTS_DIR", tmp_path)
     t = prompts.topic("plain")
     assert (t.news, t.needs_daf, t.guidance, t.testing) == (False, False, "Just guidance.", "Just guidance.")
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("what in *you* makes you eligible", "what in you makes you eligible"),
+    ("a **bold** and ***very bold*** claim", "a bold and very bold claim"),
+    ("*one* and *two*", "one and two"),
+    ("2 * 3 is six", "2 * 3 is six"),
+    ("nothing to change", "nothing to change"),
+])
+def test_plain_removes_emphasis_only(text, expected):
+    assert prompts.plain(text) == expected
+
+
+def test_the_decision_prompt_refuses_credit_for_generic_answers():
+    text = (prompts.PROMPTS_DIR / "decide.md").read_text()
+    assert "could be pasted under a different question" in text

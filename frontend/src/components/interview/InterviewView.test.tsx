@@ -330,7 +330,7 @@ describe('a report whose critiques are still being written', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Report' }))
     expect(await screen.findByText(/2 answers couldn't be reviewed/)).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Report' }))
-    await screen.findByText(/finishing your report/)
+    await screen.findByText(/finishing your report: 0 of 1 answer reviewed/)
     await userEvent.click(screen.getByRole('button', { name: 'New' }))
     expect(screen.queryByText(/finishing your report/)).toBeNull()
     await new Promise((resolve) => setTimeout(resolve, 3200))

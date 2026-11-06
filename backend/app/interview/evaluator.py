@@ -138,6 +138,18 @@ def guard(evaluation: dict, answer: str, allowed: str) -> dict:
     return evaluation
 
 
+def _plain(evaluation: dict) -> dict:
+    """Remove markdown emphasis from everything the candidate reads. Models add it even when told not to."""
+    evaluation["critique"] = prompts.plain(evaluation["critique"])
+    for field in ("strengths", "missing_points", "model_answer_points"):
+        evaluation[field] = [prompts.plain(item) for item in evaluation[field]]
+    for issue in evaluation["issues"]:
+        for field in ("quote", "why", "fix"):
+            if issue.get(field):
+                issue[field] = prompts.plain(issue[field])
+    return evaluation
+
+
 def score(evaluation: dict) -> dict:
     """Clamp scores and enforce the rubric: 'good' needs every score >= 3 and an average >= 3.5."""
     scores = {k: max(1, min(5, int(evaluation["scores"].get(k, 1)))) for k in SCORE_KEYS}
@@ -180,8 +192,8 @@ def evaluate(topic_name: str, context: str, reference: str, exchange: str, answe
     prompt = _prompt("evaluate", topic_name, context, reference, exchange, followups_left, followup_pairs, spoken)
     evaluation = llm.complete_json(MODEL, [{"role": "user", "content": prompt}], SCHEMA, "evaluation")
     follow_up = evaluation.pop("follow_up_question", None)
-    evaluation = score(guard(evaluation, answer, allowed=f"{exchange}\n{reference}"))
-    return evaluation, (follow_up.strip() if follow_up else None)
+    evaluation = _plain(score(guard(evaluation, answer, allowed=f"{exchange}\n{reference}")))
+    return evaluation, (prompts.plain(follow_up).strip() if follow_up else None)
 
 
 def decide_follow_up(topic_name: str, context: str, reference: str, exchange: str, followups_left: int,
@@ -191,4 +203,4 @@ def decide_follow_up(topic_name: str, context: str, reference: str, exchange: st
     decision = llm.complete_json(DECISION_MODEL, [{"role": "user", "content": prompt}], DECISION_SCHEMA, "decision")
     earned = score({"scores": decision["scores"], "verdict": "good"})["verdict"] == "good"
     follow_up = decision.get("follow_up_question")
-    return follow_up.strip() if earned and follow_up else None
+    return prompts.plain(follow_up).strip() if earned and follow_up else None
