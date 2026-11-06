@@ -435,7 +435,7 @@ def test_with_real_threads_the_answer_returns_while_the_critique_is_still_being_
 def test_markdown_emphasis_never_reaches_the_candidate(fake_llm):
     def emphatic(messages):
         return {"scores": {k: 4 for k in evaluator.SCORE_KEYS}, "verdict": "good", "strengths": ["A *clear* structure throughout"],
-                "issues": [{"quote": None, "type": "vague", "why": "what in *you* matters", "fix": "say **this**"}],
+                "issues": [{"quote": None, "type": "vague", "why": "The board asked what in *you* matters here", "fix": "say **this**"}],
                 "critique": "You missed *you*.", "missing_points": ["A sense of *depth* on the subject"],
                 "model_answer_points": ["**Start** with the constitutional position"],
                 "follow_up_question": "And *why*?"}
@@ -448,7 +448,7 @@ def test_markdown_emphasis_never_reaches_the_candidate(fake_llm):
     assert e["critique"] == "You missed you." and e["strengths"] == ["A clear structure throughout"]
     assert e["missing_points"] == ["A sense of depth on the subject"]
     assert e["model_answer_points"] == ["Start with the constitutional position"]
-    assert (e["issues"][0]["why"], e["issues"][0]["fix"]) == ("what in you matters", "say this")
+    assert (e["issues"][0]["why"], e["issues"][0]["fix"]) == ("The board asked what in you matters here", "say this")
     assert r["next"]["question"] == "And why?"
 
     fake_llm.json["decision"] = decision(4, "And *how*?")
