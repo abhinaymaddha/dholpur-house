@@ -1,18 +1,22 @@
 """Interview mode: question sources, the follow-up policy and the report, with the LLM faked."""
 
 import random
+import threading
+import time
 from datetime import datetime, timezone
 
 import pytest
 
 from app.dependencies import get_bank, get_interviews, get_news, get_question_sources
 from app.errors import InterviewError
-from app.interview import evaluator, prompts
+from app.interview import evaluator, prompts, session as session_module
+from app.interview.background import BackgroundWork
 from app.interview.questions import (
     ANGLES, GeneratedQuestionSource, QuestionContext, RealQuestionSource, daf_items,
 )
 from app.interview.session import MAX_FOLLOWUPS, Filters, InterviewSession, _context, _reference
 from app.repositories import NewsRepository
+from tests.fixtures.fakes import DeferredExecutor
 
 ETHICS = ["Ethics & Values"]
 DAF = "Kerala, MBBS, Government Medical College, reading novels"
@@ -232,6 +236,188 @@ def test_a_full_interview_runs_to_its_length_with_the_board_choosing(fake_llm):
 def test_topic_practice_has_no_board_seats(fake_llm):
     t = new_session().next_question(Filters(plan="topics", topics=ETHICS, question_mode="real"))
     assert "asked_by" not in t["source"]
+
+
+# ---------- not keeping the candidate waiting ----------
+
+def decision(score=4, follow_up="And if your senior insisted?"):
+    return lambda messages: {"scores": {k: score for k in evaluator.SCORE_KEYS}, "follow_up_question": follow_up}
+
+
+@pytest.fixture
+def pool():
+    return DeferredExecutor()
+
+
+def background_session(pool):
+    return InterviewSession.open(None, get_interviews(), get_bank(), get_question_sources(), BackgroundWork(pool))
+
+
+def names(fake_llm):
+    return [c["name"] for c in fake_llm.calls]
+
+
+def test_the_next_question_is_written_while_the_candidate_answers(fake_llm, pool):
+    fake_llm.json["question"] = written(angle="topic", daf_item=None)
+    session = background_session(pool)
+    filters = Filters(topics=[], daf=DAF, length=10)
+    first = session.next_question(filters)
+    assert names(fake_llm) == ["question"]
+    pool.run()                                                       # writes question 2 in the background
+    assert names(fake_llm) == ["question", "question"]
+    second = session.next_question(filters)                          # handed over, no waiting for the model
+    assert names(fake_llm) == ["question", "question"] and len(pool.queue) == 1
+    assert (first["main_index"], second["main_index"]) == (1, 2) and second["source"]["asked_by"] == "Chairperson"
+    pool.run()
+
+    changed = Filters(topics=[], daf=DAF, length=10, board="BB Swain")   # new choices: the prepared one is not used
+    fake_llm.json["question"] = written(question="A question for the new board?", angle="topic", daf_item=None)
+    assert session.next_question(changed)["question"] == "A question for the new board?"
+    assert names(fake_llm).count("question") == 4
+
+
+def test_a_follow_up_keeps_the_prepared_question_for_its_turn(fake_llm, pool):
+    fake_llm.json["question"] = written(question="The prepared one?", angle="topic", daf_item=None)
+    fake_llm.json["evaluation"] = evaluation()
+    session = background_session(pool)
+    filters = Filters(plan="topics", topics=ETHICS)
+    session.next_question(filters)
+    pool.run()
+    assert session.answer("An answer.", "coach", filters)["next"]["depth"] == 1
+    assert names(fake_llm).count("question") == 2                    # nothing written for the follow-up
+    fake_llm.json["evaluation"] = evaluation(2, "weak", None)
+    nxt = session.answer("Not sure.", "coach", filters)["next"]
+    assert (nxt["main_index"], nxt["depth"], nxt["question"]) == (2, 0, "The prepared one?")
+    assert names(fake_llm).count("question") == 2
+
+
+def test_nothing_is_prepared_past_the_end_or_for_real_questions(fake_llm, pool):
+    fake_llm.json["question"] = written(angle="topic", daf_item=None)
+    session = background_session(pool)
+    session.repo.add_turn(session.id, 9, 0, "Economy", "Question nine?", {"type": "generated"})
+    session.next_question(Filters(topics=[], length=10))             # the last one
+    assert not pool.queue
+    other = background_session(pool)
+    other.next_question(Filters(plan="topics", topics=ETHICS, question_mode="real"))
+    assert not pool.queue and session.next_question(Filters(topics=[], length=10)) is None
+
+
+def test_a_failed_preparation_is_written_when_asked_for(fake_llm, pool):
+    fake_llm.json["question"] = written(angle="topic", daf_item=None)
+    session = background_session(pool)
+    filters = Filters(topics=[], length=10)
+    session.next_question(filters)
+    fake_llm.error = RuntimeError("model down")
+    pool.run()
+    fake_llm.error = None
+    assert session.next_question(filters)["main_index"] == 2
+
+
+def test_exam_mode_waits_only_for_the_decision_and_the_report_waits_for_the_critique(fake_llm, pool):
+    fake_llm.json["decision"] = decision()
+    fake_llm.json["evaluation"] = evaluation(follow_up="Ignored?")
+    session = background_session(pool)
+    filters = Filters(plan="topics", topics=ETHICS, question_mode="real")
+    first = session.next_question(filters)
+
+    r = session.answer("Rates stay to curb inflation.", "exam", filters, spoken=True)
+    assert names(fake_llm) == ["decision"]                           # no critique yet
+    assert fake_llm.calls[0]["model"] == "model_4"
+    assert "speech recognition" in fake_llm.calls[0]["messages"][0]["content"]
+    assert r["evaluation"] == {"pending": True, "spoken": True}
+    assert (r["next"]["depth"], r["next"]["question"]) == (1, "And if your senior insisted?")
+    assert session.turns[0]["answer"] == "Rates stay to curb inflation."
+    report = session.report()
+    assert (report["pending"], report["answered"]) == (1, 0)
+    assert len(pool.queue) == 1                                      # asking again doesn't start it twice
+
+    pool.run()
+    assert names(fake_llm) == ["decision", "evaluation"] and fake_llm.calls[1]["model"] == "model_3"
+    prompt = fake_llm.calls[1]["messages"][0]["content"]
+    assert "speech recognition" in prompt and "set `follow_up_question` to null" in prompt
+    report = session.report()
+    assert (report["pending"], report["answered"], report["failed"]) == (0, 1, 0)
+    assert report["turns"][0]["id"] == first["id"] and report["turns"][0]["evaluation"]["verdict"] == "good"
+
+
+def test_exam_mode_follow_ups_obey_the_same_rule(fake_llm, pool):
+    fake_llm.json["evaluation"] = evaluation()
+    session = background_session(pool)
+    filters = Filters(plan="topics", topics=ETHICS, question_mode="real")
+    session.next_question(filters)
+    fake_llm.json["decision"] = decision(3, "A follow-up the scores don't earn?")     # average 3: below 3.5
+    assert session.answer("An answer.", "exam", filters)["next"]["depth"] == 0
+    fake_llm.json["decision"] = decision(4, "  Why?  ")
+    assert session.answer("An answer.", "exam", filters)["next"]["question"] == "Why?"
+    assert session.answer("An answer.", "exam", filters)["next"]["depth"] == 2
+
+    fake_llm.calls.clear()                                           # two follow-ups asked: no decision to make
+    assert session.answer("An answer.", "exam", filters)["next"]["depth"] == 0
+    assert names(fake_llm) == []
+
+    fake_llm.calls.clear()
+    pool.run()
+    critique = fake_llm.calls[-1]["messages"][0]["content"]          # the last answer: its whole chain, nothing later
+    assert critique.count("Candidate: An answer.") == 3
+
+
+def test_with_real_threads_the_answer_returns_while_the_critique_is_still_being_written(fake_llm):
+    release = threading.Event()
+
+    def slow_critique(messages):
+        assert release.wait(10)
+        return evaluation()(messages)
+    fake_llm.json["decision"] = decision(2, None)
+    fake_llm.json["evaluation"] = slow_critique
+    session = InterviewSession.open(None, get_interviews(), get_bank(), get_question_sources(), BackgroundWork(workers=1))
+    filters = Filters(plan="topics", topics=ETHICS, question_mode="real")
+    session.next_question(filters)
+    assert session.answer("An answer.", "exam", filters)["next"]["main_index"] == 2   # returned, critique still blocked
+    assert session.report()["pending"] == 1
+    release.set()
+    for _ in range(100):
+        if not session.report()["pending"]:
+            break
+        time.sleep(0.05)
+    assert session.report()["answered"] == 1
+
+
+def test_a_background_evaluation_retries_then_gives_up_so_the_report_can_finish(fake_llm, pool, monkeypatch):
+    monkeypatch.setattr(session_module, "RETRY_DELAYS", (0, 0))
+    fake_llm.json["decision"] = decision(2, None)
+    session = background_session(pool)
+    filters = Filters(plan="topics", topics=ETHICS, question_mode="real")
+    session.next_question(filters)
+    session.answer("One.", "exam", filters)
+    session.answer("Two.", "exam", filters)
+
+    attempts = []
+
+    def flaky(messages):
+        attempts.append(1)
+        if len(attempts) == 1:
+            raise RuntimeError("rate limited")
+        return evaluation()(messages)
+    fake_llm.json["evaluation"] = flaky
+    pool.queue[1:] = []                                              # the second answer is handled below
+    pool.run()
+    assert len(attempts) == 2 and session.turns[0]["evaluation"]["verdict"] == "good"
+
+    def down(messages):
+        attempts.append(1)
+        raise RuntimeError("down")
+    fake_llm.json["evaluation"] = down
+    attempts.clear()
+    session.background = BackgroundWork(pool)                        # a restart lost it: the report starts it again
+    assert session.report()["pending"] == 1
+    pool.run()
+    assert len(attempts) == 3
+    report = session.report()
+    assert (report["pending"], report["failed"], report["answered"]) == (0, 1, 1)
+
+    fake_llm.calls.clear()
+    session.finish_evaluation(session.turns[1]["id"])                # no longer pending: nothing to do
+    assert fake_llm.calls == []
 
 
 # ---------- report ----------

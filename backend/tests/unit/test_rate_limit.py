@@ -56,3 +56,13 @@ def test_idle_visitors_are_forgotten():
     clock.t += 120
     rl.check("fresh")
     assert set(rl._recent) == {"fresh"}
+
+
+def test_a_request_counts_every_model_call_it_leads_to():
+    rl = RateLimiter(per_minute=100, per_day=100, daily_budget=4, clock=Clock())
+    rl.check("a", ai_calls=3)
+    with pytest.raises(RateLimited, match="site has reached"):
+        rl.check("b", ai_calls=2)                # counted nothing: a smaller request still fits
+    rl.check("b", ai_calls=1)
+    with pytest.raises(RateLimited, match="site has reached"):
+        rl.check("c")

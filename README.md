@@ -82,6 +82,7 @@ touching code. Each part of the app uses a named slot:
 | `model_1` | Ask AI: answers from the retrieved transcripts |
 | `model_2` | Interview: writing new questions |
 | `model_3` | Interview: evaluating answers and choosing follow-ups |
+| `model_4` | Interview, Exam mode: quickly choosing follow-ups, so the candidate isn't kept waiting |
 
 For example, to use Claude for the evaluator, point the slot at the `anthropic` provider and set
 `ANTHROPIC_API_KEY` in `backend/.env`:
@@ -112,6 +113,7 @@ any setup with Traefik). In Dokploy:
    RATE_PER_MINUTE=10                      # optional limits on the AI features (defaults shown):
    RATE_PER_DAY=150                        #   per visitor, per minute and per day
    AI_DAILY_BUDGET=900                     #   AI calls per day for the whole site; keep it under your provider's limit
+                                           #   (a 10-question Exam-mode interview uses about 30)
    ```
 3. Add your domain to the `frontend` service on port 80, with HTTPS.
 4. Deploy. The database fills itself on first start.
@@ -139,6 +141,8 @@ Telegram export ──► ingest: join split messages, drop reposts and chatter,
   words, and code checks remove any quote that isn't in your answer and any recent date or figure that isn't in
   the question, your answer or the news item. The rules for follow-ups live in code, not in the prompt: only an
   answer scoring at least 3 on every dimension and 3.5 on average earns one, and a question gets at most two.
+- **Speed.** The next question is written while you answer the current one. In Exam mode you wait only for a
+  quick follow-up decision; the full critique is written in the background and is ready for the report.
 - **Embeddings** are computed locally with [fastembed](https://github.com/qdrant/fastembed)
   (`paraphrase-multilingual-MiniLM-L12-v2`, which also handles Hindi), so only the AI features need an API key.
 

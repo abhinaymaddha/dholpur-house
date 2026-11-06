@@ -41,5 +41,8 @@ class InterviewRepository(Repository):
         self._run("UPDATE interview_turns SET answer = %s, evaluation = %s, mode = %s WHERE id = %s",
                   (answer, Jsonb(evaluation), mode, turn_id))
 
+    def save_evaluation(self, turn_id: int, evaluation: dict) -> None:
+        self._run("UPDATE interview_turns SET evaluation = %s WHERE id = %s", (Jsonb(evaluation), turn_id))
+
     def mark_skipped(self, turn_id: int) -> None:
         self._run("UPDATE interview_turns SET evaluation = %s WHERE id = %s", (Jsonb({"skipped": True}), turn_id))

@@ -10,6 +10,7 @@ from functools import lru_cache
 from fastapi import Request
 
 from app.config import settings
+from app.interview.background import BackgroundWork
 from app.interview.bank import QuestionBank
 from app.interview.questions import GeneratedQuestionSource, QuestionSource, RealQuestionSource
 from app.repositories import (
@@ -49,6 +50,11 @@ def get_bank() -> QuestionBank:
 def get_question_sources() -> dict[str, QuestionSource]:
     bank = get_bank()
     return {"generated": GeneratedQuestionSource(bank, get_news()), "real": RealQuestionSource(bank)}
+
+
+@lru_cache
+def get_background() -> BackgroundWork:
+    return BackgroundWork()
 
 
 @lru_cache

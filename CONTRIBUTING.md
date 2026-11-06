@@ -93,7 +93,8 @@ frontend/src/
 
 Each topic is a file in `backend/app/interview/prompts/topics/`. Its header says whether the topic draws on
 current affairs (`news: yes`) or needs the candidate's DAF (`daf: required`); the body is the guidance the
-question writer and the evaluator see. `question.md`, `question_daf.md` and `evaluate.md` are the templates.
+question writer and the evaluator see. `question.md`, `question_daf.md`, `evaluate.md` and `decide.md` (Exam
+mode's quick follow-up decision) are the templates; the last two share the rubric in `scoring.md`.
 Prompt files are read on every call, so you can edit and retry without restarting. The follow-up rules are in
 `app/interview/session.py`. How a full interview runs (who asks, which areas each board member covers, how
 topics are weighted) is in `app/interview/board.py`; a new topic should be added to a member's area there.
