@@ -68,10 +68,11 @@ def sql():
 @pytest.fixture
 def client():
     """The real app without its startup hooks (the session fixture already prepared the database)."""
-    from app.dependencies import get_rate_limiter
+    from app.dependencies import get_background, get_rate_limiter
     from app.main import app
     from app.services.rate_limit import RateLimiter
     app.dependency_overrides.clear()
     app.dependency_overrides[get_rate_limiter] = lambda: RateLimiter(10**6, 10**6, 10**6)   # limits tested on their own
+    app.dependency_overrides[get_background] = lambda: None   # within the request; background work tested on its own
     yield TestClient(app)
     app.dependency_overrides.clear()

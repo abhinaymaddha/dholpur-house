@@ -62,7 +62,7 @@ it('runs a coach-mode conversation with feedback, a follow-up and a report', asy
   expect(screen.getByText('Good enough for a follow-up')).toBeInTheDocument()
   expect(m.interviewAnswer).toHaveBeenCalledWith('s1', 'Output of the economy', 'coach', expect.anything(), false)
 
-  const report: InterviewReport = { answered: 1, skipped: 0, average: 3.25, verdicts: { good: 1, partial: 0, weak: 0 },
+  const report: InterviewReport = { answered: 1, pending: 0, failed: 0, skipped: 0, average: 3.25, verdicts: { good: 1, partial: 0, weak: 0 },
     dimensions: { relevance: 4 }, topics: [{ topic: 'Economy', answered: 1, average: 3.25 }], turns: [turns[0]] }
   m.getInterviewReport.mockResolvedValue(report)
   await userEvent.click(screen.getByRole('button', { name: 'Report' }))
@@ -134,7 +134,7 @@ it('shows an empty report and the mobile filter toggle', async () => {
     return { evaluation: evaluation(), next: turns[0] }
   })
   await userEvent.type(screen.getByPlaceholderText(/Answer as you would/), 'A{Enter}')
-  m.getInterviewReport.mockResolvedValue({ answered: 0, skipped: 0, average: 0, verdicts: { good: 0, partial: 0, weak: 0 },
+  m.getInterviewReport.mockResolvedValue({ answered: 0, pending: 0, failed: 0, skipped: 0, average: 0, verdicts: { good: 0, partial: 0, weak: 0 },
     dimensions: {}, topics: [], turns: [] })
   await userEvent.click(await screen.findByRole('button', { name: 'Report' }))
   expect(await screen.findByText('Answer a few questions first to see a report.')).toBeInTheDocument()
@@ -289,12 +289,49 @@ describe('full interview', () => {
       turns = [turns[0], { ...turns[1], answer: 'My answer', mode: 'exam', evaluation: evaluation() }]
       return { evaluation: evaluation(), next: null }
     })
-    m.getInterviewReport.mockResolvedValue({ answered: 1, skipped: 1, average: 3, verdicts: { good: 0, partial: 1, weak: 0 },
+    m.getInterviewReport.mockResolvedValue({ answered: 1, pending: 0, failed: 0, skipped: 1, average: 3, verdicts: { good: 0, partial: 1, weak: 0 },
       dimensions: {}, topics: [], turns: [] })
     await userEvent.type(screen.getByLabelText('Your answer'), 'My answer{Enter}')
     expect(await screen.findByText(/That will be all; the interview is over\. Your report is below/)).toBeInTheDocument()
     expect(await screen.findByText(/1 answered · 1 skipped/)).toBeInTheDocument()
     expect(speech.spoken()).toContain('Thank you. That will be all; the interview is over.')
     expect(screen.getByRole('button', { name: /Next question/ })).toBeDisabled()
+  })
+})
+
+describe('a report whose critiques are still being written', () => {
+  const report = (over: Partial<InterviewReport>): InterviewReport => ({ answered: 0, pending: 0, failed: 0, skipped: 0, average: 3,
+    verdicts: { good: 0, partial: 1, weak: 0 }, dimensions: {}, topics: [], turns: [], ...over })
+
+  it('shows progress and refreshes until they are all in, surviving a failed refresh', async () => {
+    localStorage.setItem('upsc-interview', JSON.stringify({ sessionId: 's1', mode: 'exam', voice: false, filters: { plan: 'topics' } }))
+    turns = [{ ...turn(), answer: 'A', mode: 'exam', evaluation: { pending: true } as never }]
+    m.getInterviewReport.mockReset()
+      .mockResolvedValueOnce(report({ pending: 2 }))
+      .mockRejectedValueOnce(new Error('blip'))
+      .mockResolvedValueOnce(report({ answered: 1, pending: 1 }))
+      .mockResolvedValue(report({ answered: 1, failed: 1 }))
+    render(<InterviewView stats={stats} onOpen={() => {}} />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Report' }))
+    expect(await screen.findByText(/finishing your report: 0 of 2 answers reviewed/)).toBeInTheDocument()
+    expect(await screen.findByText(/finishing your report: 1 of 2 answers reviewed/, undefined, { timeout: 10_000 })).toBeInTheDocument()
+    expect(await screen.findByText(/1 answer couldn't be reviewed/, undefined, { timeout: 5_000 })).toBeInTheDocument()
+    expect(screen.getByText(/1 answered/)).toBeInTheDocument()
+    expect(m.getInterviewReport).toHaveBeenCalledTimes(4)
+  })
+
+  it('stops refreshing when a new interview starts, and words several failures properly', async () => {
+    localStorage.setItem('upsc-interview', JSON.stringify({ sessionId: 's1', mode: 'exam', voice: false, filters: { plan: 'topics' } }))
+    turns = [{ ...turn(), answer: 'A', mode: 'exam', evaluation: { pending: true } as never }]
+    m.getInterviewReport.mockReset().mockResolvedValueOnce(report({ answered: 1, failed: 2 })).mockResolvedValue(report({ pending: 1 }))
+    render(<InterviewView stats={stats} onOpen={() => {}} />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Report' }))
+    expect(await screen.findByText(/2 answers couldn't be reviewed/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Report' }))
+    await screen.findByText(/finishing your report/)
+    await userEvent.click(screen.getByRole('button', { name: 'New' }))
+    expect(screen.queryByText(/finishing your report/)).toBeNull()
+    await new Promise((resolve) => setTimeout(resolve, 3200))
+    expect(m.getInterviewReport).toHaveBeenCalledTimes(2)
   })
 })

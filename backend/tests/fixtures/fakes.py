@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import re
 from collections.abc import Callable, Iterator
+from concurrent.futures import Executor, Future
 
 import numpy as np
 
@@ -24,6 +25,26 @@ class FakeEmbedder:
                 v[int(hashlib.md5(word.encode()).hexdigest(), 16) % DIM] += 1
             v[0] += 0.01   # never a zero vector (cosine distance needs a length)
             yield v / np.linalg.norm(v)
+
+
+class DeferredExecutor(Executor):
+    """Holds background work until the test calls run(), so tests can see the state in between."""
+
+    def __init__(self):
+        self.queue: list[tuple[Future, Callable, tuple]] = []
+
+    def submit(self, fn, /, *args, **kwargs):
+        future: Future = Future()
+        self.queue.append((future, fn, args))
+        return future
+
+    def run(self) -> None:
+        while self.queue:
+            future, fn, args = self.queue.pop(0)
+            try:
+                future.set_result(fn(*args))
+            except Exception as e:
+                future.set_exception(e)
 
 
 @register

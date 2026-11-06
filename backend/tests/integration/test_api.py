@@ -104,6 +104,30 @@ def test_interview_errors(client, fake_llm):
     assert client.post("/api/interview/next", json={"filters": {"length": 15}}).status_code == 422
 
 
+def test_the_daily_budget_counts_each_answers_model_calls(client, fake_llm):
+    from app.dependencies import get_rate_limiter
+    from app.main import app
+    from app.services.rate_limit import RateLimiter
+    limiter = RateLimiter(10**6, 10**6, 10**6)
+    app.dependency_overrides[get_rate_limiter] = lambda: limiter
+    fake_llm.json["evaluation"] = lambda m: {
+        "scores": {k: 4 for k in evaluator.SCORE_KEYS}, "verdict": "good", "issues": [], "strengths": [],
+        "critique": "", "missing_points": [], "model_answer_points": [], "follow_up_question": "Why?"}
+    filters = {"plan": "topics", "topics": ["Health"], "question_mode": "real"}
+    sid = client.post("/api/interview/next", json={"filters": filters}).json()["session_id"]
+    assert limiter._ai_today == 0
+    answer = {"session_id": sid, "answer": "x", "filters": filters}
+    client.post("/api/interview/answer", json={**answer, "mode": "coach"})
+    assert limiter._ai_today == 1
+    client.post("/api/interview/answer", json={**answer, "mode": "exam"})
+    assert limiter._ai_today == 3
+    fake_llm.json["question"] = lambda m: {"question": "Why?", "angle": "topic", "daf_item": None,
+                                           "based_on": "the topic", "article_url": None}
+    client.post("/api/interview/answer", json={**answer, "mode": "exam",
+                                               "filters": {**filters, "question_mode": "generated"}})
+    assert limiter._ai_today == 6
+
+
 def test_a_full_interview_ends_with_no_next_question(client, fake_llm):
     fake_llm.json["question"] = lambda m: {"question": "Why civil services?", "angle": "topic", "daf_item": None,
                                            "based_on": "the topic", "article_url": None}

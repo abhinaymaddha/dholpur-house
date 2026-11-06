@@ -35,8 +35,9 @@ class RateLimiter:
         if day != self._day:
             self._day, self._daily, self._ai_today = day, {}, 0
 
-    def check(self, visitor: str, uses_ai: bool = True) -> None:
-        """Count one request, or raise RateLimited (and count nothing) if it would exceed a limit."""
+    def check(self, visitor: str, uses_ai: bool = True, ai_calls: int = 1) -> None:
+        """Count one request and the model calls it leads to, or raise RateLimited (and count nothing) if it would
+        exceed a limit."""
         with self._lock:
             now = self.clock()
             self._roll_day(now)
@@ -47,11 +48,11 @@ class RateLimiter:
                 raise RateLimited("You're going a bit fast. Please wait a minute and try again.")
             if self._daily.get(visitor, 0) >= self.per_day:
                 raise RateLimited("You've reached today's limit for AI features. Please come back tomorrow.")
-            if uses_ai and self._ai_today >= self.daily_budget:
+            if uses_ai and self._ai_today + ai_calls > self.daily_budget:
                 raise RateLimited("The site has reached today's limit for AI features. Please come back tomorrow; "
                                   "browsing and real past questions still work.")
             recent.append(now)
             self._daily[visitor] = self._daily.get(visitor, 0) + 1
-            self._ai_today += int(uses_ai)
+            self._ai_today += ai_calls if uses_ai else 0
             if len(self._recent) > 10_000:   # forget idle visitors so memory stays bounded
                 self._recent = {k: v for k, v in self._recent.items() if v and v[-1] > now - 60}

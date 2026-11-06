@@ -61,6 +61,18 @@ export function InterviewView({ stats, onOpen }: { stats: Stats | null; onOpen: 
   useEffect(() => () => stopSpeaking(), [])
   useEffect(() => { bottom.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }) }, [turns, busy, report])
 
+  // Exam-mode critiques are written in the background: refresh the report until they are all in.
+  useEffect(() => {
+    if (!report?.pending || !sessionId) return
+    let cancelled = false
+    const timer = setTimeout(() => {
+      getInterviewReport(sessionId)
+        .then((r) => { if (!cancelled) setReport(r) })
+        .catch(() => { if (!cancelled) setReport((r) => r && { ...r }) })   // a blip: try again shortly
+    }, REPORT_REFRESH_MS)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [report, sessionId])
+
   const open = openTurn(turns)
   const full = filters.plan === 'full'
   const asked = Math.max(0, ...turns.map((t) => t.main_index))
@@ -251,6 +263,7 @@ export function InterviewView({ stats, onOpen }: { stats: Stats | null; onOpen: 
   )
 }
 
+const REPORT_REFRESH_MS = 3000
 const CLOSING_WORDS = 'Thank you. That will be all; the interview is over.'
 
 const openTurn = (turns: Turn[]) => [...turns].reverse().find((t) => t.answer === null && !t.evaluation?.skipped)
@@ -412,6 +425,14 @@ function CandidateBubble({ text }: { text: string }) {
 }
 
 function ReportCard({ r }: { r: InterviewReport }) {
+  if (r.pending) {
+    return (
+      <p role="status" className="flex items-center gap-2 rounded-xl border border-sandstone-200 bg-sandstone-50/50 p-4 text-sm text-stone-600 dark:border-sandstone-900 dark:bg-sandstone-500/5 dark:text-stone-300">
+        <Loader2 size={15} className="shrink-0 animate-spin" />
+        The board is finishing your report: {r.answered + r.failed} of {r.answered + r.failed + r.pending} answers reviewed…
+      </p>
+    )
+  }
   if (!r.answered) return <p className="text-sm text-stone-500">Answer a few questions first to see a report.</p>
   return (
     <section className="space-y-4 rounded-xl border border-sandstone-200 bg-sandstone-50/50 p-5 dark:border-sandstone-900 dark:bg-sandstone-500/5">
@@ -422,6 +443,11 @@ function ReportCard({ r }: { r: InterviewReport }) {
           {r.verdicts.good} good, {r.verdicts.partial} partial, {r.verdicts.weak} weak
         </span>
       </div>
+      {r.failed > 0 && (
+        <p className="text-xs text-stone-500">
+          {r.failed} {r.failed === 1 ? 'answer' : 'answers'} couldn't be reviewed because the AI model was unavailable, and {r.failed === 1 ? 'is' : 'are'} not counted here.
+        </p>
+      )}
       <ScoreBars scores={r.dimensions} />
       <div className="flex flex-wrap gap-2">
         {r.topics.map((t) => (

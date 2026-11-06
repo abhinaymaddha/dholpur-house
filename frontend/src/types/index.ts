@@ -178,6 +178,8 @@ export interface Turn {
 
 export interface InterviewReport {
   answered: number
+  pending: number   // Exam-mode critiques still being written
+  failed: number    // answers the model couldn't evaluate
   skipped: number
   average: number
   verdicts: Record<'good' | 'partial' | 'weak', number>

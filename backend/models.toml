@@ -1,11 +1,13 @@
 # LLM configuration: which provider and model each part of the app uses.
 #
-# Code refers only to the model slots (model_1, model_2, model_3), so changing a slot here switches
+# Code refers only to the model slots (model_1 to model_4), so changing a slot here switches
 # every flow that uses it. The file is re-read when it changes; no restart needed.
 #
 #   model_1  Browse > Ask AI: answers questions from retrieved transcripts (streamed)
 #   model_2  Interview: writes new questions
 #   model_3  Interview: evaluates each answer critically and writes follow-ups
+#   model_4  Interview, Exam mode: quickly decides on a follow-up, while model_3 writes the critique in the
+#            background. Speed matters most here: the candidate waits for this one.
 #
 # To use your own model: pick (or add) a provider below, put its API key in backend/.env under the
 # name in `api_key_env` (or, for a private local setup only, in `api_key`), and point the slots at it.
@@ -69,6 +71,12 @@ provider = "openrouter"
 id = "nvidia/nemotron-3.5-super-vl:free"
 max_tokens = 12000
 reasoning_effort = "medium"
+
+[models.model_4]
+provider = "openrouter"
+id = "nvidia/nemotron-3.5-super-vl:free"
+max_tokens = 6000
+reasoning_effort = "low"
 
 # Examples (replace a slot's settings with one of these):
 #

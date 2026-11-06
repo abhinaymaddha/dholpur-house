@@ -21,6 +21,7 @@ from app.interview import prompts
 from app import llm
 
 MODEL = "model_3"
+DECISION_MODEL = "model_4"
 SCORE_KEYS = ["relevance", "accuracy", "depth", "balance", "practicality", "clarity", "tone"]
 ISSUE_TYPES = ["factual_error", "unsupported_claim", "vague", "off_topic", "missing_perspective",
                "impractical", "tone", "structure"]
@@ -44,6 +45,12 @@ SCHEMA = _obj({
     "missing_points": {"type": "array", "items": {"type": "string"}},
     "model_answer_points": {"type": "array", "items": {"type": "string"}},
     "follow_up_question": {"type": ["string", "null"]},
+})
+
+# Exam mode's quick decision: only what's needed to choose between a follow-up and the next question.
+DECISION_SCHEMA = _obj({
+    "scores": SCHEMA["properties"]["scores"],
+    "follow_up_question": SCHEMA["properties"]["follow_up_question"],
 })
 
 # Specifics a model tends to invent. Kept only if the same text appears in the allowed sources.
@@ -148,10 +155,8 @@ TRANSCRIPTION_NOTE = (
     "or count it as a factual error.")
 
 
-def evaluate(topic_name: str, context: str, reference: str, exchange: str, answer: str,
-             followups_left: int, followup_pairs: list[tuple[str, str]],
-             spoken: bool = False) -> tuple[dict, str | None]:
-    """Evaluate the latest answer. Returns (evaluation, follow-up question or None)."""
+def _prompt(template: str, topic_name: str, context: str, reference: str, exchange: str, followups_left: int,
+            followup_pairs: list[tuple[str, str]], spoken: bool) -> str:
     topic = prompts.topic(topic_name)
     instruction = (
         "If (and only if) the verdict is good, write one follow-up question in `follow_up_question` that probes "
@@ -160,13 +165,30 @@ def evaluate(topic_name: str, context: str, reference: str, exchange: str, answe
         "or specific news. One short question, no preamble. Otherwise set it to null. "
         f"(Follow-ups left for this question: {followups_left}.)"
         if followups_left > 0 else "No more follow-ups for this question: set `follow_up_question` to null.")
-    prompt = prompts.render(
-        "evaluate", topic=topic.name, guidance=topic.guidance, today=date.today().strftime("%d %B %Y"),
+    return prompts.render(
+        template, scoring=prompts.render("scoring"), topic=topic.name, guidance=topic.guidance, today=date.today().strftime("%d %B %Y"),
         context=context, reference=reference or "(none: judge facts only against stable, well-established knowledge)",
         exchange=exchange,
         followup_examples="\n".join(f"- Q: {q}\n  Follow-up: {f}" for q, f in followup_pairs) or "- (none found)",
         followup_instruction=instruction, transcription_note=TRANSCRIPTION_NOTE if spoken else "")
+
+
+def evaluate(topic_name: str, context: str, reference: str, exchange: str, answer: str,
+             followups_left: int, followup_pairs: list[tuple[str, str]],
+             spoken: bool = False) -> tuple[dict, str | None]:
+    """Evaluate the latest answer. Returns (evaluation, follow-up question or None)."""
+    prompt = _prompt("evaluate", topic_name, context, reference, exchange, followups_left, followup_pairs, spoken)
     evaluation = llm.complete_json(MODEL, [{"role": "user", "content": prompt}], SCHEMA, "evaluation")
     follow_up = evaluation.pop("follow_up_question", None)
     evaluation = score(guard(evaluation, answer, allowed=f"{exchange}\n{reference}"))
     return evaluation, (follow_up.strip() if follow_up else None)
+
+
+def decide_follow_up(topic_name: str, context: str, reference: str, exchange: str, followups_left: int,
+                     followup_pairs: list[tuple[str, str]], spoken: bool = False) -> str | None:
+    """Exam mode: the follow-up this answer earns, or None. Same rubric as evaluate(), without the write-up."""
+    prompt = _prompt("decide", topic_name, context, reference, exchange, followups_left, followup_pairs, spoken)
+    decision = llm.complete_json(DECISION_MODEL, [{"role": "user", "content": prompt}], DECISION_SCHEMA, "decision")
+    earned = score({"scores": decision["scores"], "verdict": "good"})["verdict"] == "good"
+    follow_up = decision.get("follow_up_question")
+    return follow_up.strip() if earned and follow_up else None

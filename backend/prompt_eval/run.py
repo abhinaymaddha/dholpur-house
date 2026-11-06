@@ -1,6 +1,7 @@
 """Run the prompt test cases and print the results for review.
 
     python -m prompt_eval.run evaluator        # each evaluator case (one LLM call each)
+    python -m prompt_eval.run decisions        # Exam mode's quick decision on the evaluator cases, timed
     python -m prompt_eval.run questions        # generated questions per case (one LLM call each)
     python -m prompt_eval.run evaluator ir_vague tone_partisan   # only some cases
 
@@ -9,6 +10,7 @@ Cases live next to this file as JSON; add more as you tune. Uses the models in m
 
 import json
 import sys
+import time
 from pathlib import Path
 
 from app.database import pool
@@ -38,6 +40,17 @@ def run_evaluator(only: list[str]) -> None:
         print(f"  guard removed: {e['guard']}")
 
 
+def run_decisions(only: list[str]) -> None:
+    for c in json.loads((HERE / "evaluator_cases.json").read_text()):
+        if only and c["id"] not in only:
+            continue
+        exchange = f"Board: {c['question']}\nCandidate: {c['answer']}"
+        pairs = [(r["text"], r["follow_up"]) for r in get_bank().similar([c["question"]], n=12) if r["follow_up"]][:5]
+        started = time.time()
+        follow_up = evaluator.decide_follow_up(c["topic"], c["context"], c["reference"], exchange, 2, pairs)
+        print(f"{c['id']}  (expect: {c['expect']})  {time.time() - started:.1f}s  follow-up: {follow_up}")
+
+
 def run_questions(only: list[str]) -> None:
     for c in json.loads((HERE / "question_cases.json").read_text()):
         if only and c["id"] not in only:
@@ -55,4 +68,4 @@ def run_questions(only: list[str]) -> None:
 if __name__ == "__main__":
     pool.open()
     what, *only = sys.argv[1:] or ["evaluator"]
-    {"evaluator": run_evaluator, "questions": run_questions}[what](only)
+    {"evaluator": run_evaluator, "decisions": run_decisions, "questions": run_questions}[what](only)

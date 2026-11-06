@@ -12,3 +12,7 @@ id = "fake-writer"
 [models.model_3]
 provider = "fake"
 id = "fake-evaluator"
+
+[models.model_4]
+provider = "fake"
+id = "fake-decider"
