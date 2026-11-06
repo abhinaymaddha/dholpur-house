@@ -100,6 +100,7 @@ it('resumes a saved session and shows every kind of question source', async () =
     turn({ id: 3, main_index: 3, source: { type: 'generated', angle: 'topic' } }),
     turn({ id: 4, main_index: 4, source: { type: 'daf', daf_item: 'Kota' } }),
     turn({ id: 5, main_index: 5, source: { type: 'current', url: 'https://n/2', title: 'Budget', publisher: 'PIB' } }),
+    turn({ id: 6, main_index: 6, source: { type: 'opening' } }),
   ]
   m.getSimilarQuestions.mockResolvedValue([])
   render(<InterviewView stats={stats} onOpen={() => {}} />)
@@ -109,6 +110,7 @@ it('resumes a saved session and shows every kind of question source', async () =
   expect(screen.getByText('New question · on the topic')).toBeInTheDocument()
   expect(screen.getByText('From your DAF: Kota')).toBeInTheDocument()
   expect(screen.getByText(/From the news: Budget · PIB/)).toBeInTheDocument()
+  expect(screen.getByText("The board's opening question")).toBeInTheDocument()
   await userEvent.click(screen.getAllByRole('button', { name: /How have boards asked this/ })[0])
   expect(await screen.findByText('No similar questions found.')).toBeInTheDocument()
 })

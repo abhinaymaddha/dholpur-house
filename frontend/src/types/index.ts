@@ -158,7 +158,7 @@ export interface Turn {
   topic: string
   question: string
   source: {
-    type: 'generated' | 'past' | 'current' | 'daf' | 'followup'
+    type: 'generated' | 'past' | 'current' | 'daf' | 'followup' | 'opening'
     angle?: 'news' | 'daf' | 'topic'
     based_on?: string
     transcript_id?: string

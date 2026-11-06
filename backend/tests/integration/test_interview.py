@@ -12,10 +12,11 @@ from app.errors import InterviewError
 from app.interview import evaluator, prompts, session as session_module
 from app.interview.background import BackgroundWork
 from app.interview.questions import (
-    ANGLES, GeneratedQuestionSource, QuestionContext, RealQuestionSource, daf_items,
+    ANGLES, OPENERS, GeneratedQuestionSource, QuestionContext, RealQuestionSource, daf_items,
 )
 from app.interview.session import MAX_FOLLOWUPS, Filters, InterviewSession, _context, _reference
 from app.repositories import NewsRepository
+from app.repositories.questions import CLEAN
 from tests.fixtures.fakes import DeferredExecutor
 
 ETHICS = ["Ethics & Values"]
@@ -257,23 +258,72 @@ def names(fake_llm):
     return [c["name"] for c in fake_llm.calls]
 
 
-def test_the_next_question_is_written_while_the_candidate_answers(fake_llm, pool):
-    fake_llm.json["question"] = written(angle="topic", daf_item=None)
+def test_a_full_interview_starts_at_once_and_the_next_question_is_written_meanwhile(fake_llm, pool):
+    fake_llm.json["question"] = written(question="A written question?", angle="topic", daf_item=None)
     session = background_session(pool)
     filters = Filters(topics=[], daf=DAF, length=10)
     first = session.next_question(filters)
-    assert names(fake_llm) == ["question"]
+    assert names(fake_llm) == [] and first["question"] in OPENERS    # no model call to begin
+    assert first["source"] == {"type": "opening", "asked_by": "Chairperson"} and first["topic"] == "DAF & Background"
     pool.run()                                                       # writes question 2 in the background
-    assert names(fake_llm) == ["question", "question"]
+    assert names(fake_llm) == ["question"]
     second = session.next_question(filters)                          # handed over, no waiting for the model
-    assert names(fake_llm) == ["question", "question"] and len(pool.queue) == 1
-    assert (first["main_index"], second["main_index"]) == (1, 2) and second["source"]["asked_by"] == "Chairperson"
-    pool.run()
+    assert names(fake_llm) == ["question"] and second["question"] == "A written question?"
+    assert second["main_index"] == 2 and second["source"]["asked_by"] == "Chairperson"
+    assert len(pool.queue) == 1
 
-    changed = Filters(topics=[], daf=DAF, length=10, board="BB Swain")   # new choices: the prepared one is not used
-    fake_llm.json["question"] = written(question="A question for the new board?", angle="topic", daf_item=None)
-    assert session.next_question(changed)["question"] == "A question for the new board?"
-    assert names(fake_llm).count("question") == 4
+
+def test_a_ready_made_question_is_asked_when_the_written_one_is_not_ready(fake_llm, pool, monkeypatch):
+    monkeypatch.setattr(session_module, "PREPARED_WAIT", 0.01)
+    fake_llm.json["question"] = written(angle="topic", daf_item=None)
+    session = background_session(pool)
+    filters = Filters(topics=[], length=10)
+    session.next_question(filters)                                   # question 2 is queued, not written
+    second = session.next_question(filters)
+    assert names(fake_llm) == [] and second["main_index"] == 2       # didn't wait: no model call was needed
+    assert second["source"]["type"] == "past"
+
+
+def test_ready_made_questions_fall_back_to_writing_only_when_there_are_none(fake_llm, pool, monkeypatch):
+    fake_llm.json["question"] = written(question="Written after all?", angle="topic", daf_item=None)
+    sources = {**get_question_sources(), "instant": RealQuestionSource(type("Empty", (), {"similar": lambda self, *a, **k: []})())}
+    session = InterviewSession.open(None, get_interviews(), get_bank(), sources, BackgroundWork(pool))
+    assert session.next_question(Filters(plan="topics", topics=ETHICS))["question"] == "Written after all?"
+    with pytest.raises(InterviewError, match="Add your DAF"):        # still explains what the candidate must do
+        session.next_question(Filters(plan="topics", topics=["DAF & Background"]))
+
+
+def test_topic_practice_starts_with_a_clean_real_question(fake_llm, pool):
+    session = background_session(pool)
+    sources = dict(session.sources)
+    sources["instant"] = type("Fixed", (), {"next": lambda self, ctx: ("A clean question?", {"type": "past"})})()
+    session.sources = sources
+    fake_llm.json["question"] = written(angle="topic", daf_item=None)
+    first = session.next_question(Filters(plan="topics", topics=ETHICS))
+    assert first["question"] == "A clean question?" and names(fake_llm) == []
+
+
+def test_an_opening_question_is_evaluated_as_one(fake_llm):
+    assert _context({"type": "opening"}) == "This is the board's opening question."
+
+
+@pytest.mark.parametrize("text, clean", [
+    ("What are the challenges in the criminal justice system?", True),
+    ("Is Live-in registration in line with Constitutional rights?", True),
+    ("What do you think about MSP legalization?", True),
+    ("What qualities do you think is most important? I told about integrity.", False),   # the candidate's note
+    ("Have you read any contemporary poets? (I mentioned Rupi Kaur)", False),
+    ("What is its severity in the region?", False),                                      # needs the question before
+    ("Global economic order kaise change ho raha hai?", False),                          # reads badly in English
+    ("Why XX company after your MBA degree?", False),                                    # another candidate's details
+    ("How did you come across your hobby of chess?", False),
+    ("Some questions about books and reading habits", False),
+    ("8 So if someone stays in Mumbai is he a citizen?", False),
+    ("Why is it?", False),
+])
+def test_only_clean_questions_are_asked_in_place_of_a_written_one(sql, text, clean):
+    rows = sql(f"SELECT 1 AS ok FROM (VALUES (%s)) AS q(text) WHERE {CLEAN}", (text,))
+    assert bool(rows) is clean
 
 
 def test_a_follow_up_keeps_the_prepared_question_for_its_turn(fake_llm, pool):
@@ -284,11 +334,11 @@ def test_a_follow_up_keeps_the_prepared_question_for_its_turn(fake_llm, pool):
     session.next_question(filters)
     pool.run()
     assert session.answer("An answer.", "coach", filters)["next"]["depth"] == 1
-    assert names(fake_llm).count("question") == 2                    # nothing written for the follow-up
+    assert names(fake_llm).count("question") == 1                    # nothing written for the follow-up
     fake_llm.json["evaluation"] = evaluation(2, "weak", None)
     nxt = session.answer("Not sure.", "coach", filters)["next"]
     assert (nxt["main_index"], nxt["depth"], nxt["question"]) == (2, 0, "The prepared one?")
-    assert names(fake_llm).count("question") == 2
+    assert names(fake_llm).count("question") == 1
 
 
 def test_nothing_is_prepared_past_the_end_or_for_real_questions(fake_llm, pool):
@@ -302,7 +352,7 @@ def test_nothing_is_prepared_past_the_end_or_for_real_questions(fake_llm, pool):
     assert not pool.queue and session.next_question(Filters(topics=[], length=10)) is None
 
 
-def test_a_failed_preparation_is_written_when_asked_for(fake_llm, pool):
+def test_a_failed_preparation_does_not_stop_the_interview(fake_llm, pool):
     fake_llm.json["question"] = written(angle="topic", daf_item=None)
     session = background_session(pool)
     filters = Filters(topics=[], length=10)

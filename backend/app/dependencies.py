@@ -12,7 +12,7 @@ from fastapi import Request
 from app.config import settings
 from app.interview.background import BackgroundWork
 from app.interview.bank import QuestionBank
-from app.interview.questions import GeneratedQuestionSource, QuestionSource, RealQuestionSource
+from app.interview.questions import GeneratedQuestionSource, OpeningQuestionSource, QuestionSource, RealQuestionSource
 from app.repositories import (
     ChunkRepository, InterviewRepository, NewsRepository, QuestionRepository, TranscriptRepository,
 )
@@ -49,7 +49,8 @@ def get_bank() -> QuestionBank:
 @lru_cache
 def get_question_sources() -> dict[str, QuestionSource]:
     bank = get_bank()
-    return {"generated": GeneratedQuestionSource(bank, get_news()), "real": RealQuestionSource(bank)}
+    return {"generated": GeneratedQuestionSource(bank, get_news()), "real": RealQuestionSource(bank),
+            "instant": RealQuestionSource(bank, clean=True), "opening": OpeningQuestionSource(bank)}
 
 
 @lru_cache

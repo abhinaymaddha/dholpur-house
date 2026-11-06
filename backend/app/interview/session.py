@@ -3,9 +3,11 @@
 The rules live here, not in the prompts: an answer earns a follow-up only if the evaluator rates it
 good (every score at least 3, average at least 3.5), and a main question gets at most MAX_FOLLOWUPS.
 
-To keep the candidate from waiting on the model: the next main question is written while they answer
-the current one, and in Exam mode, where feedback is hidden until the report, they wait only for a
-quick follow-up decision while the full critique is written in the background.
+To keep the candidate from waiting on the model: a full interview opens with a ready-made question,
+the next main question is written while they answer the current one (and if it isn't ready in time, a
+clean real past question on the same topic is asked instead), and in Exam mode, where feedback is
+hidden until the report, they wait only for a quick follow-up decision while the full critique is
+written in the background.
 """
 
 from __future__ import annotations
@@ -25,6 +27,7 @@ from app.repositories import InterviewRepository
 logger = logging.getLogger(__name__)
 
 MAX_FOLLOWUPS = 2
+PREPARED_WAIT = 2         # seconds to wait for a question still being written before asking a ready-made one
 RETRY_DELAYS = (10, 30)   # seconds before retrying a background evaluation (free models hit rate limits)
 
 
@@ -55,6 +58,8 @@ def _context(src: dict) -> str:
         return f"This is a real question asked in a past interview (CSE {src.get('cse_year')}, {src.get('board')} board)."
     if src["type"] == "generated":
         return f"The board wrote this question for the candidate; it builds on: {src.get('based_on')}."
+    if src["type"] == "opening":
+        return "This is the board's opening question."
     return "This is a follow-up question."
 
 
@@ -121,14 +126,26 @@ class InterviewSession:
         main_index = max((t["main_index"] for t in turns), default=0) + 1
         if filters.plan == "full" and main_index > filters.length:
             return None
-        prepared = self.background.take(self.id, filters.key(main_index)) if self.background else None
-        topic, question, src = prepared or self._write(main_index, filters, turns)
+        written = None
+        if self.background and filters.question_mode != "real":
+            written = (self.background.take(self.id, filters.key(main_index), wait=PREPARED_WAIT)
+                       or self._ready_made(main_index, filters, turns))
+        topic, question, src = written or self._write(main_index, filters, turns)
         turn = self.repo.add_turn(self.id, main_index, 0, topic, question, src)
         self._prepare_next(main_index + 1, filters, [*turns, turn])
         return turn
 
-    def _write(self, main_index: int, filters: Filters, turns: list[dict]) -> tuple[str, str, dict]:
-        """Write a main question: its topic, text and source."""
+    def _ready_made(self, main_index: int, filters: Filters, turns: list[dict]) -> tuple[str, str, dict] | None:
+        """A question to ask at once, without the model: None if there is no suitable one."""
+        source = "opening" if filters.plan == "full" and main_index == 1 else "instant"
+        try:
+            return self._write(main_index, filters, turns, source)
+        except InterviewError:
+            return None
+
+    def _write(self, main_index: int, filters: Filters, turns: list[dict],
+               source: str | None = None) -> tuple[str, str, dict]:
+        """Get a main question from a source (by default the one the candidate chose): topic, text and source."""
         daf = (filters.daf or "").strip() or None
         member = None
         if filters.plan == "full":
@@ -138,8 +155,8 @@ class InterviewSession:
             topic = self.pick_topic(filters.topics, main_index)
         if topic.needs_daf and not daf:
             raise InterviewError("Add your DAF details in the filters to be asked DAF-based questions")
-        source = self.sources["real" if filters.question_mode == "real" else "generated"]
-        question, src = source.next(QuestionContext(topic=topic, board=filters.board, daf=daf, turns=turns))
+        name = source or ("real" if filters.question_mode == "real" else "generated")
+        question, src = self.sources[name].next(QuestionContext(topic=topic, board=filters.board, daf=daf, turns=turns))
         return topic.name, question, {**src, "asked_by": member} if member else src
 
     def _prepare_next(self, main_index: int, filters: Filters, turns: list[dict]) -> None:
