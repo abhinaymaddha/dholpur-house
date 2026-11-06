@@ -214,4 +214,4 @@ class GeneratedQuestionSource(QuestionSource):
         if article:
             src |= {"url": article["url"], "title": article["title"], "summary": article["summary"][:600],
                     "publisher": article["source"], "published_at": article["published_at"].isoformat()}
-        return out["question"].strip(), src
+        return prompts.plain(out["question"]).strip(), src

@@ -432,6 +432,31 @@ def test_with_real_threads_the_answer_returns_while_the_critique_is_still_being_
     assert session.report()["answered"] == 1
 
 
+def test_markdown_emphasis_never_reaches_the_candidate(fake_llm):
+    def emphatic(messages):
+        return {"scores": {k: 4 for k in evaluator.SCORE_KEYS}, "verdict": "good", "strengths": ["A *clear* structure throughout"],
+                "issues": [{"quote": None, "type": "vague", "why": "what in *you* matters", "fix": "say **this**"}],
+                "critique": "You missed *you*.", "missing_points": ["A sense of *depth* on the subject"],
+                "model_answer_points": ["**Start** with the constitutional position"],
+                "follow_up_question": "And *why*?"}
+    fake_llm.json["evaluation"] = emphatic
+    session = new_session()
+    filters = Filters(plan="topics", topics=ETHICS, question_mode="real")
+    session.next_question(filters)
+    r = session.answer("An answer.", "coach", filters)
+    e = r["evaluation"]
+    assert e["critique"] == "You missed you." and e["strengths"] == ["A clear structure throughout"]
+    assert e["missing_points"] == ["A sense of depth on the subject"]
+    assert e["model_answer_points"] == ["Start with the constitutional position"]
+    assert (e["issues"][0]["why"], e["issues"][0]["fix"]) == ("what in you matters", "say this")
+    assert r["next"]["question"] == "And why?"
+
+    fake_llm.json["decision"] = decision(4, "And *how*?")
+    assert evaluator.decide_follow_up("Ethics & Values", "ctx", "", "Board: q\nCandidate: a", 1, []) == "And how?"
+    fake_llm.json["question"] = written(question="What about *this*?", angle="topic", daf_item=None)
+    assert new_session().next_question(Filters(plan="topics", topics=ETHICS))["question"] == "What about this?"
+
+
 def test_a_background_evaluation_retries_then_gives_up_so_the_report_can_finish(fake_llm, pool, monkeypatch):
     monkeypatch.setattr(session_module, "RETRY_DELAYS", (0, 0))
     fake_llm.json["decision"] = decision(2, None)

@@ -35,6 +35,14 @@ class Topic:
         return part.split("##", 1)[0].strip()
 
 
+_EMPHASIS = re.compile(r"\*{1,3}([^*\n]+?)\*{1,3}")
+
+
+def plain(text: str) -> str:
+    """Model text as it is shown and read aloud: without markdown emphasis such as *you* or **you**."""
+    return _EMPHASIS.sub(r"\1", text)
+
+
 def render(template: str, **values: str) -> str:
     text = (PROMPTS_DIR / f"{template}.md").read_text(encoding="utf-8")
     missing = set(_PLACEHOLDER.findall(text)) - values.keys()

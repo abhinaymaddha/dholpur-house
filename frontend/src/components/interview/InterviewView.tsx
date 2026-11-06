@@ -427,10 +427,11 @@ function CandidateBubble({ text }: { text: string }) {
 
 function ReportCard({ r }: { r: InterviewReport }) {
   if (r.pending) {
+    const total = r.answered + r.failed + r.pending
     return (
       <p role="status" className="flex items-center gap-2 rounded-xl border border-sandstone-200 bg-sandstone-50/50 p-4 text-sm text-stone-600 dark:border-sandstone-900 dark:bg-sandstone-500/5 dark:text-stone-300">
         <Loader2 size={15} className="shrink-0 animate-spin" />
-        The board is finishing your report: {r.answered + r.failed} of {r.answered + r.failed + r.pending} answers reviewed…
+        The board is finishing your report: {r.answered + r.failed} of {total} {total === 1 ? 'answer' : 'answers'} reviewed…
       </p>
     )
   }

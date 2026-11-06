@@ -27,6 +27,7 @@ The only facts you may treat as given, besides the question and the candidate's 
 {{scoring}}
 
 ## Output
+- All text is plain sentences: no markdown, no asterisks or underscores for emphasis.
 - Issue types: use `tone` whenever the problem is how something is said (partisan, disrespectful, arrogant, emotional, flattering), even if the claim is also unsupported; use `factual_error` only for claims that are wrong.
 - `issues`: the specific problems, most serious first (usually 2-5; fewer for a strong answer). For each: `quote` = the exact words from the candidate's latest answer that show the problem, copied verbatim (use null, not "None", for something missing entirely), `type`, `why` it is a problem for a board member, and `fix` = what they should have said instead, phrased as something the candidate could actually say in the room.
 - `strengths`: what genuinely worked, in a few words each. Empty if nothing did. No flattery.
