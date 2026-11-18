@@ -1,4 +1,4 @@
-fastapi==0.162.*
+fastapi==0.163.*
 starlette>=1.10.0         # security floor (FastAPI allows older, vulnerable versions)
 uvicorn[standard]==0.54.*
 pydantic-settings==2.*
